@@ -1,0 +1,215 @@
+/* ============================================
+   EMG Analyzer - Global Styles
+   Beautiful glassmorphism theme with smooth transitions
+   ============================================ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   Base Styles
+   ============================================ */
+:root {
+  /* Light mode colors */
+  --background-start: #f8fafc;
+  --background-end: #e2e8f0;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  
+  /* Chart colors */
+  --chart-emg: #ef4444;
+  --chart-ax: #3b82f6;
+  --chart-ay: #22c55e;
+  --chart-az: #f59e0b;
+}
+
+/* Dark mode colors */
+.dark {
+  --background-start: #0f172a;
+  --background-end: #1e293b;
+  --glass-bg: rgba(30, 41, 59, 0.8);
+  --glass-border: rgba(71, 85, 105, 0.5);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+}
+
+/* ============================================
+   Body & Background
+   ============================================ */
+body {
+  background: linear-gradient(135deg, var(--background-start) 0%, var(--background-end) 100%);
+  min-height: 100vh;
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Animated background pattern */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ============================================
+   Glass Card Component
+   ============================================ */
+@layer components {
+  .glass-card {
+    @apply relative overflow-hidden rounded-2xl p-6;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 10px 15px -3px rgba(0, 0, 0, 0.1),
+      0 4px 6px -4px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* Smaller glass card variant */
+  .glass-card-sm {
+    @apply glass-card p-4 rounded-xl;
+  }
+
+  /* Header glass style */
+  .glass-header {
+    @apply glass-card rounded-none rounded-b-2xl;
+    border-top: none;
+  }
+}
+
+/* ============================================
+   Sensor Value Display
+   ============================================ */
+@layer components {
+  .sensor-value {
+    @apply text-3xl font-bold tracking-tight;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sensor-label {
+    @apply text-sm font-medium uppercase tracking-wider;
+    color: var(--text-secondary);
+  }
+
+  .sensor-unit {
+    @apply text-sm font-normal ml-1;
+    color: var(--text-secondary);
+  }
+}
+
+/* ============================================
+   Chart Customization
+   ============================================ */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--text-secondary);
+  stroke-opacity: 0.2;
+}
+
+.recharts-text {
+  fill: var(--text-secondary) !important;
+  font-size: 12px;
+}
+
+/* ============================================
+   Smooth Scrollbar
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-secondary);
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  opacity: 0.8;
+}
+
+/* ============================================
+   Animation Classes
+   ============================================ */
+@layer utilities {
+  .animate-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+}
+
+/* ============================================
+   Responsive Typography
+   ============================================ */
+@layer base {
+  h1 {
+    @apply text-2xl sm:text-3xl md:text-4xl font-bold;
+  }
+
+  h2 {
+    @apply text-xl sm:text-2xl font-semibold;
+  }
+
+  h3 {
+    @apply text-lg sm:text-xl font-medium;
+  }
+}
+
+/* ============================================
+   Button Styles
+   ============================================ */
+@layer components {
+  .btn-icon {
+    @apply p-2 rounded-xl transition-all duration-200;
+    @apply hover:bg-white/20 dark:hover:bg-white/10;
+    @apply active:scale-95;
+  }
+}
+
+/* ============================================
+   Live Indicator Pulse
+   ============================================ */
+@keyframes livePulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+.live-indicator {
+  animation: livePulse 2s ease-in-out infinite;
+}
