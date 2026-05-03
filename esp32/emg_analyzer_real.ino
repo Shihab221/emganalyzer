@@ -274,8 +274,12 @@ void sendSensorData(int emg, float ax, float ay, float az) {
     delay(30);
     digitalWrite(LED_PIN, HIGH);
   } else {
-    Serial.print("FAILED! Error: ");
-    Serial.println(httpResponseCode);
+    Serial.print("FAILED! Code: ");
+    Serial.print(httpResponseCode);
+    Serial.print(" (");
+    Serial.print(HTTPClient::errorToString(httpResponseCode));
+    Serial.println(")");
+    Serial.println("Hint: check SERVER_URL = PC LAN IP + port from `npm run dev` (not localhost).");
   }
   
   http.end();

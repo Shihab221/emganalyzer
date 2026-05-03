@@ -30,6 +30,6 @@ export interface ApiResponse {
   success: boolean;
   message?: string;
   data?: SensorData | SensorData[];
-  latest?: SensorData;
+  latest?: SensorData | null;
   history?: SensorData[];
 }

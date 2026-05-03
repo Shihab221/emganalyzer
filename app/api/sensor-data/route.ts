@@ -6,6 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SensorData, ApiResponse } from '@/lib/types';
 
+/** Node.js runtime for in-memory history (not Edge). */
+export const runtime = 'nodejs';
+/** Always run on the server; never statically cache responses. */
+export const dynamic = 'force-dynamic';
+
 // ============================================
 // In-Memory Data Storage
 // Keeps the last 100 data points for charting

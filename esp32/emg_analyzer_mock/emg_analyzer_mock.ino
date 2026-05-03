@@ -27,8 +27,8 @@
 // ============================================
 
 // Your WiFi credentials
-const char* WIFI_SSID = "YOUR_WIFI_NAME";        // <-- Change this!
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"; // <-- Change this!
+const char* WIFI_SSID = "FZH_N_202";        // <-- Change this!
+const char* WIFI_PASSWORD = "25388206"; // <-- Change this!
 
 // Server URL - Change to your computer's IP when testing locally
 // Example: "http://192.168.1.100:3000/api/sensor-data"
@@ -227,7 +227,11 @@ void sendSensorData(int emg, float ax, float ay, float az) {
     digitalWrite(LED_PIN, HIGH);
   } else {
     Serial.print("Error sending data! Code: ");
-    Serial.println(httpResponseCode);
+    Serial.print(httpResponseCode);
+    Serial.print(" (");
+    Serial.print(HTTPClient::errorToString(httpResponseCode));
+    Serial.println(")");
+    Serial.println("Hint: server must be reachable at SERVER_URL (same WiFi, correct IP, port matches npm run dev).");
     
     // Double blink for error
     digitalWrite(LED_PIN, LOW);
