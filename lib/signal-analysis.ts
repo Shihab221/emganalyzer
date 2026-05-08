@@ -6,6 +6,25 @@
 import { SensorData, RMSData, FFTData } from './types';
 
 /**
+ * Infer average sample rate (Hz) from consecutive sample timestamps (server wall-clock).
+ */
+export function inferSampleRateHz(data: SensorData[]): number {
+  if (data.length < 2) return 2;
+  let sum = 0;
+  let n = 0;
+  for (let i = 1; i < data.length; i++) {
+    const dt = (data[i].timestamp - data[i - 1].timestamp) / 1000;
+    if (dt > 0.001 && dt < 10) {
+      sum += dt;
+      n++;
+    }
+  }
+  if (n === 0) return 2;
+  const hz = sum / n > 0 ? 1 / (sum / n) : 2;
+  return Math.round(hz * 100) / 100;
+}
+
+/**
  * Calculate RMS (Root Mean Square) of EMG signal
  */
 export function calculateRMS(data: SensorData[], windowSize: number = 50): RMSData {

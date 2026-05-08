@@ -12,14 +12,17 @@ import {
 } from 'recharts';
 import { Waves } from 'lucide-react';
 import { SensorData } from '@/lib/types';
-import { calculateFFT } from '@/lib/signal-analysis';
+import { calculateFFT, inferSampleRateHz } from '@/lib/signal-analysis';
 
 interface FFTDisplayProps {
   data: SensorData[];
 }
 
 export function FFTDisplay({ data }: FFTDisplayProps) {
-  const fft = useMemo(() => calculateFFT(data, 2), [data]);
+  const fft = useMemo(() => {
+    const rate = inferSampleRateHz(data);
+    return calculateFFT(data, Math.max(rate, 0.1));
+  }, [data]);
 
   const chartData = useMemo(() => {
     return fft.frequencies.map((freq, i) => ({

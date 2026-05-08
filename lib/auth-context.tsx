@@ -6,7 +6,10 @@ import { User, UserRole } from './types';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; message?: string; user?: User }>;
   register: (data: {
     email: string;
     password: string;
@@ -14,7 +17,7 @@ interface AuthContextType {
     role: UserRole;
     age?: number;
     gender?: 'male' | 'female' | 'other';
-  }) => Promise<{ success: boolean; message?: string }>;
+  }) => Promise<{ success: boolean; message?: string; user?: User }>;
   logout: () => void;
   isDoctor: boolean;
   isPatient: boolean;
@@ -50,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.success && data.user) {
         setUser(data.user);
         localStorage.setItem('emg_user', JSON.stringify(data.user));
-        return { success: true };
+        return { success: true, user: data.user };
       }
       return { success: false, message: data.message || 'Login failed' };
     } catch {
@@ -77,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.success && data.user) {
         setUser(data.user);
         localStorage.setItem('emg_user', JSON.stringify(data.user));
-        return { success: true };
+        return { success: true, user: data.user };
       }
       return { success: false, message: data.message || 'Registration failed' };
     } catch {

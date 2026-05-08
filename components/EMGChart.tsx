@@ -26,23 +26,20 @@ interface EMGChartProps {
 }
 
 export function EMGChart({ data, currentValue }: EMGChartProps) {
-  // Format time for tooltip
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  };
-
   // Custom tooltip component
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      const row = payload[0].payload as ChartDataPoint;
+      const when = typeof row.timestamp === 'number'
+        ? new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'medium',
+            hour12: false,
+          }).format(row.timestamp)
+        : payload[0].label;
       return (
         <div className="glass-card-sm !p-3 !rounded-lg shadow-xl border border-red-500/20">
-          <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">{when}</p>
           <p className="text-lg font-bold text-red-500">
             {payload[0].value}
             <span className="text-xs font-normal ml-1">raw</span>
@@ -144,9 +141,9 @@ export function EMGChart({ data, currentValue }: EMGChartProps) {
 
       {/* Chart Legend */}
       <div className="mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>ADC Range: 0 - 4095 (12-bit)</span>
-          <span>Update Rate: 500ms</span>
+        <div className="flex flex-wrap gap-2 justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span>ADC range: 0 – 4095 (12‑bit)</span>
+          <span>Axis / tooltips use device local date &amp; time</span>
         </div>
       </div>
     </div>

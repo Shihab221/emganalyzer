@@ -1,55 +1,43 @@
 // ============================================
-// API Route: /api/csv
-// Handles CSV export of EMG data
+// API Route: /api/csv — export session CSV with RMS + FFT columns (real timestamps)
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSensorHistory } from '@/lib/store';
+import { getSessionById } from '@/lib/store';
+import { buildEmgCsvWithAnalysis } from '@/lib/emg-csv';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/csv
- * Download current EMG data as CSV
- */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const sessionId = searchParams.get('sessionId');
-    
-    const history = getSensorHistory();
-    
-    if (history.length === 0) {
+    const sessionId = request.nextUrl.searchParams.get('sessionId');
+    if (!sessionId) {
       return NextResponse.json(
-        { success: false, message: 'No data available to export' },
+        { success: false, message: 'Provide sessionId to export recorded data.' },
         { status: 400 }
       );
     }
 
-    const csvHeader = 'timestamp,emg,time\n';
-    const csvData = history.map(d => {
-      const date = new Date(d.timestamp);
-      const timeStr = date.toISOString();
-      return `${d.timestamp},${d.emg},${timeStr}`;
-    }).join('\n');
+    const data = getSessionById(sessionId)?.data;
+    if (!data || data.length === 0) {
+      return NextResponse.json({ success: false, message: 'Session not found or empty' }, { status: 404 });
+    }
 
-    const csv = csvHeader + csvData;
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `emg_data_${timestamp}.csv`;
+    const csv = buildEmgCsvWithAnalysis(data);
+    const safeId = sessionId.replace(/[^\w.-]+/g, '_').slice(0, 120);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `emg_session_${safeId}_${stamp}.csv`;
 
     return new NextResponse(csv, {
       status: 200,
       headers: {
-        'Content-Type': 'text/csv',
+        'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {
     console.error('Error exporting CSV:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to export CSV' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: 'Failed to export CSV' }, { status: 500 });
   }
 }

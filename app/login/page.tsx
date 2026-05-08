@@ -41,9 +41,9 @@ export default function LoginPage() {
         });
       }
 
-      if (result.success) {
-        router.push('/dashboard');
-      } else {
+      if (result.success && result.user) {
+        router.push(result.user.role === 'doctor' ? '/doctor' : '/dashboard');
+      } else if (!result.success) {
         setError(result.message || 'Authentication failed');
       }
     } catch {

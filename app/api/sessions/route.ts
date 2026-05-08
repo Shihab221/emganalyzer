@@ -1,21 +1,31 @@
 // ============================================
 // API Route: /api/sessions
-// Handles patient sessions management
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllSessions, getPatientSessions, sessions, activeSessions } from '@/lib/store';
+import {
+  getAllSessions,
+  getPatientSessions,
+  activeSessions,
+  getSessionById,
+} from '@/lib/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/sessions
- * Get all sessions or sessions for a specific patient
- */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
+    const sessionId = searchParams.get('sessionId');
+
+    if (sessionId) {
+      const session = getSessionById(sessionId);
+      if (!session) {
+        return NextResponse.json({ success: false, message: 'Session not found' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, session });
+    }
+
     const patientId = searchParams.get('patientId');
 
     let sessionList;
@@ -34,9 +44,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching sessions:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch sessions' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: 'Failed to fetch sessions' }, { status: 500 });
   }
 }

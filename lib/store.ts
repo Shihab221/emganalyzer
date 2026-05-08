@@ -1,12 +1,9 @@
 // ============================================
 // In-Memory Data Store
-// Simulates a database for development/demo
-// In production, replace with a real database
 // ============================================
 
 import { User, PatientProfile, SensorData, EMGSession, DoctorComment } from './types';
 
-// User storage (in production, use a real database with hashed passwords)
 interface StoredUser extends User {
   password: string;
 }
@@ -16,17 +13,26 @@ export const patientProfiles: Map<string, PatientProfile> = new Map();
 export const sessions: Map<string, EMGSession> = new Map();
 export const comments: Map<string, DoctorComment[]> = new Map();
 
-// Current active sessions per patient
+/** While a patient recording is active: patientId -> sessionId */
 export const activeSessions: Map<string, string> = new Map();
 
-// Sensor data buffer (latest data for currently connected patient)
-export let currentPatientId: string | null = null;
+const MAX_LIVE = 150;
 export let sensorHistory: SensorData[] = [];
 export let latestData: SensorData | null = null;
 
-// Initialize with demo users
+export interface RecordingStateSnapshot {
+  patientId: string;
+  sessionId: string;
+  startedAt: number;
+}
+
+let recordingState: RecordingStateSnapshot | null = null;
+
+export function getRecordingState(): RecordingStateSnapshot | null {
+  return recordingState;
+}
+
 export function initializeDemoData() {
-  // Demo doctor
   const doctorId = 'doctor-demo-001';
   users.set('doctor@demo.com', {
     id: doctorId,
@@ -37,7 +43,6 @@ export function initializeDemoData() {
     createdAt: Date.now(),
   });
 
-  // Demo patient
   const patientId = 'patient-demo-001';
   users.set('patient@demo.com', {
     id: patientId,
@@ -56,50 +61,62 @@ export function initializeDemoData() {
   });
 }
 
-// Reset sensor data
-export function resetSensorData() {
+export function resetLiveSensorData() {
   sensorHistory = [];
   latestData = null;
 }
 
-// Update current patient
-export function setCurrentPatient(patientId: string | null) {
-  if (currentPatientId !== patientId) {
-    currentPatientId = patientId;
-    resetSensorData();
-  }
-}
-
-// Add sensor data
-export function addSensorData(data: SensorData) {
-  latestData = data;
-  sensorHistory.push(data);
-  if (sensorHistory.length > 1000) {
+/** Live stream buffer (ESP32 → server → dashboard poll) */
+export function addLiveSensorSample(sample: SensorData) {
+  latestData = sample;
+  sensorHistory.push(sample);
+  if (sensorHistory.length > MAX_LIVE) {
     sensorHistory.shift();
   }
 }
 
-// Get sensor history
+/** Append copies to active recording session, if any */
+export function appendToActiveRecording(sample: SensorData) {
+  if (!recordingState) return;
+  const session = sessions.get(recordingState.sessionId);
+  if (!session || !session.isActive) return;
+  session.data.push({ emg: sample.emg, timestamp: sample.timestamp });
+}
+
 export function getSensorHistory(): SensorData[] {
   return [...sensorHistory];
 }
 
-// Get latest data
 export function getLatestData(): SensorData | null {
   return latestData;
 }
 
-// Create or get active session for patient
-export function getOrCreateSession(patientId: string, patientName: string, profile?: PatientProfile): EMGSession {
-  const existingSessionId = activeSessions.get(patientId);
-  if (existingSessionId) {
-    const session = sessions.get(existingSessionId);
-    if (session && session.isActive) {
-      return session;
+export function getSessionById(sessionId: string): EMGSession | undefined {
+  return sessions.get(sessionId);
+}
+
+/**
+ * Starts a new recording session. Only one ESP stream is modeled; starting another patient's
+ * recording finalizes any other active recording automatically.
+ */
+export function startRecording(
+  patientId: string,
+  patientName: string,
+  profile?: PatientProfile
+): EMGSession {
+  if (recordingState && recordingState.patientId !== patientId) {
+    endRecording(recordingState.patientId);
+  }
+
+  if (recordingState && recordingState.patientId === patientId) {
+    const existingId = recordingState.sessionId;
+    const existing = sessions.get(existingId);
+    if (existing && existing.isActive) {
+      return existing;
     }
   }
 
-  const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const session: EMGSession = {
     id: sessionId,
     patientId,
@@ -113,39 +130,43 @@ export function getOrCreateSession(patientId: string, patientName: string, profi
 
   sessions.set(sessionId, session);
   activeSessions.set(patientId, sessionId);
+  recordingState = { patientId, sessionId, startedAt: session.startTime };
   return session;
 }
 
-// End session
-export function endSession(patientId: string) {
-  const sessionId = activeSessions.get(patientId);
-  if (sessionId) {
-    const session = sessions.get(sessionId);
-    if (session) {
-      session.isActive = false;
-      session.endTime = Date.now();
-      session.data = [...sensorHistory];
-    }
-    activeSessions.delete(patientId);
+export function endRecording(patientId: string): EMGSession | null {
+  if (!recordingState || recordingState.patientId !== patientId) {
+    return null;
   }
+  const session = sessions.get(recordingState.sessionId);
+  recordingState = null;
+  activeSessions.delete(patientId);
+
+  if (session) {
+    session.isActive = false;
+    session.endTime = Date.now();
+  }
+  return session ?? null;
 }
 
-// Get all sessions
 export function getAllSessions(): EMGSession[] {
   return Array.from(sessions.values()).sort((a, b) => b.startTime - a.startTime);
 }
 
-// Get patient sessions
 export function getPatientSessions(patientId: string): EMGSession[] {
   return Array.from(sessions.values())
-    .filter(s => s.patientId === patientId)
+    .filter((s) => s.patientId === patientId)
     .sort((a, b) => b.startTime - a.startTime);
 }
 
-// Add comment to session
-export function addComment(sessionId: string, doctorId: string, doctorName: string, content: string): DoctorComment {
+export function addComment(
+  sessionId: string,
+  doctorId: string,
+  doctorName: string,
+  content: string
+): DoctorComment {
   const comment: DoctorComment = {
-    id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
     sessionId,
     doctorId,
     doctorName,
@@ -160,10 +181,8 @@ export function addComment(sessionId: string, doctorId: string, doctorName: stri
   return comment;
 }
 
-// Get comments for session
 export function getSessionComments(sessionId: string): DoctorComment[] {
   return comments.get(sessionId) || [];
 }
 
-// Initialize on module load
 initializeDemoData();

@@ -10,12 +10,11 @@ export default function HomePage() {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (user) {
-        router.push('/dashboard');
-      } else {
-        router.push('/login');
-      }
+    if (isLoading) return;
+    if (user) {
+      router.replace(user.role === 'doctor' ? '/doctor' : '/dashboard');
+    } else {
+      router.replace('/login');
     }
   }, [user, isLoading, router]);
 
@@ -29,7 +28,7 @@ export default function HomePage() {
           EMG Analyzer
         </h1>
         <p className="text-slate-500 dark:text-slate-400">
-          Loading...
+          Loading…
         </p>
       </div>
     </div>
