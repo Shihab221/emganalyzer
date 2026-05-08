@@ -9,6 +9,7 @@ import { FFTDisplay } from '@/components/FFTDisplay';
 import { PatientInfo } from '@/components/PatientInfo';
 import { CommentSection } from '@/components/CommentSection';
 import { DISPLAY_SAMPLE_RATE_HZ } from '@/lib/constants';
+import { rawEmgToMv } from '@/lib/emg-calibration';
 import type { ChartDataPoint, EMGSession } from '@/lib/types';
 import { SensorCard } from '@/components/SensorCard';
 import { Activity, ArrowLeft, Clock, Download } from 'lucide-react';
@@ -87,8 +88,10 @@ export default function DoctorSessionDetailPage() {
         )
       : 0;
 
-  const latestEmg =
-    session && session.data.length ? session.data[session.data.length - 1].emg : 0;
+  const latestMv =
+    session && session.data.length
+      ? Math.round(rawEmgToMv(session.data[session.data.length - 1].emg) * 100) / 100
+      : null;
 
   const downloadCsv = async () => {
     if (!sessionId) return;
@@ -193,7 +196,7 @@ export default function DoctorSessionDetailPage() {
               onClick={downloadCsv}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700"
             >
-              <Download className="w-4 h-4" /> CSV (EMG + RMS + FFT columns)
+              <Download className="w-4 h-4" /> Download CSV (timestamp · mV columns)
             </button>
           )}
         </div>
@@ -201,11 +204,11 @@ export default function DoctorSessionDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <SensorCard
             title="EMG (latest)"
-            value={chartData.length ? latestEmg : '—'}
-            unit="raw"
+            value={latestMv != null ? latestMv : '—'}
+            unit="mV"
             icon={Activity}
             color="red"
-            subtitle="Last sample"
+            subtitle="Instantaneous scaled"
           />
           <SensorCard
             title="Samples"
@@ -233,7 +236,7 @@ export default function DoctorSessionDetailPage() {
           />
         </div>
 
-        <EMGChart data={chartData} currentValue={chartData.length ? latestEmg : 0} />
+        <EMGChart data={chartData} currentMv={latestMv} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <RMSDisplay data={session.data} />

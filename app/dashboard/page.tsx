@@ -8,6 +8,7 @@ import { EMGChart, EMGChartSkeleton } from '@/components/EMGChart';
 import { SensorCard, SensorCardSkeleton } from '@/components/SensorCard';
 import { SensorData, ChartDataPoint, ApiResponse } from '@/lib/types';
 import { DISPLAY_SAMPLE_RATE_HZ } from '@/lib/constants';
+import { rawEmgToMv } from '@/lib/emg-calibration';
 import {
   Activity,
   Wifi,
@@ -322,7 +323,7 @@ export default function DashboardPage() {
               <Download className="w-4 h-4" /> Download last session CSV
             </button>
             <span className="text-xs text-slate-500">
-              CSV includes RMS and FFT-derived columns plus real timestamps.
+              CSV columns: timestamp, instantaneous emg_mv, window AC RMS (mV), FFT peak magnitude (mV‑scaled bins).
             </span>
           </div>
         )}
@@ -339,11 +340,13 @@ export default function DashboardPage() {
             <>
               <SensorCard
                 title="EMG signal"
-                value={currentData?.emg ?? '—'}
-                unit="raw"
+                value={
+                  currentData != null ? Math.round(rawEmgToMv(currentData.emg) * 100) / 100 : '—'
+                }
+                unit="mV"
                 icon={Activity}
                 color="red"
-                subtitle="Muscle activity"
+                subtitle="Instantaneous (ADC scaled)"
               />
               <SensorCard
                 title="Live buffer"
@@ -377,7 +380,10 @@ export default function DashboardPage() {
           {pageLoading ? (
             <EMGChartSkeleton />
           ) : (
-            <EMGChart data={chartData} currentValue={currentData?.emg ?? 0} />
+            <EMGChart
+              data={chartData}
+              currentMv={currentData != null ? rawEmgToMv(currentData.emg) : null}
+            />
           )}
         </div>
 

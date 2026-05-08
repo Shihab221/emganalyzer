@@ -1,9 +1,9 @@
 // ============================================
-// Signal Analysis Utilities
-// RMS and FFT calculations for EMG data
+// Signal Analysis Utilities (EMG scaled to mV)
 // ============================================
 
 import { SensorData, RMSData, FFTData } from './types';
+import { rawEmgToMv, rawEmgToAcMv } from '@/lib/emg-calibration';
 
 /**
  * Infer average sample rate (Hz) from consecutive sample timestamps (server wall-clock).
@@ -25,27 +25,32 @@ export function inferSampleRateHz(data: SensorData[]): number {
 }
 
 /**
- * Calculate RMS (Root Mean Square) of EMG signal
+ * Windowed AC RMS (mV): convert counts → mV, subtract window mean, then RMS.
  */
 export function calculateRMS(data: SensorData[], windowSize: number = 50): RMSData {
   if (data.length === 0) {
     return { value: 0, windowSize, timestamp: Date.now() };
   }
 
-  const recentData = data.slice(-windowSize);
-  const sumSquares = recentData.reduce((sum, d) => sum + d.emg * d.emg, 0);
-  const rms = Math.sqrt(sumSquares / recentData.length);
+  const recent = data.slice(-windowSize);
+  const mvs = recent.map((d) => rawEmgToMv(d.emg));
+  const mu = mvs.reduce((a, b) => a + b, 0) / mvs.length;
+  let sumSq = 0;
+  for (const v of mvs) {
+    const z = v - mu;
+    sumSq += z * z;
+  }
+  const rms = Math.sqrt(sumSq / mvs.length);
 
   return {
     value: Math.round(rms * 100) / 100,
-    windowSize: recentData.length,
+    windowSize: mvs.length,
     timestamp: Date.now(),
   };
 }
 
 /**
- * Simple FFT implementation using DFT
- * For a real production app, use a library like fft.js
+ * DFT on AC signal in mV: x'_t = (x_t − 2048)·(V_ref / 4095), then same DFT bins as counts would give, scaled linearly → magnitudes are in millivolt-like units (/N normalization).
  */
 export function calculateFFT(data: SensorData[], sampleRate: number = 2): FFTData {
   if (data.length < 4) {
@@ -57,7 +62,7 @@ export function calculateFFT(data: SensorData[], sampleRate: number = 2): FFTDat
   }
 
   const n = data.length;
-  const emgValues = data.map(d => d.emg - 2048);
+  const samples = data.map((d) => rawEmgToAcMv(d.emg));
 
   const frequencies: number[] = [];
   const magnitudes: number[] = [];
@@ -69,8 +74,8 @@ export function calculateFFT(data: SensorData[], sampleRate: number = 2): FFTDat
 
     for (let t = 0; t < n; t++) {
       const angle = (2 * Math.PI * k * t) / n;
-      real += emgValues[t] * Math.cos(angle);
-      imag -= emgValues[t] * Math.sin(angle);
+      real += samples[t] * Math.cos(angle);
+      imag -= samples[t] * Math.sin(angle);
     }
 
     const magnitude = Math.sqrt(real * real + imag * imag) / n;
@@ -97,26 +102,27 @@ export function calculateFFT(data: SensorData[], sampleRate: number = 2): FFTDat
 }
 
 /**
- * Calculate moving average of EMG signal
+ * Moving average of measured voltage at ADC (absolute mV from raw counts).
  */
 export function movingAverage(data: SensorData[], windowSize: number = 5): number[] {
-  if (data.length < windowSize) {
-    return data.map(d => d.emg);
+  const mvs = data.map((d) => rawEmgToMv(d.emg));
+  if (mvs.length < windowSize) {
+    return mvs;
   }
 
   const result: number[] = [];
-  for (let i = 0; i < data.length; i++) {
+  for (let i = 0; i < mvs.length; i++) {
     const start = Math.max(0, i - windowSize + 1);
-    const window = data.slice(start, i + 1);
-    const avg = window.reduce((sum, d) => sum + d.emg, 0) / window.length;
-    result.push(Math.round(avg));
+    const window = mvs.slice(start, i + 1);
+    const avg = window.reduce((sum, v) => sum + v, 0) / window.length;
+    result.push(Math.round(avg * 100) / 100);
   }
 
   return result;
 }
 
 /**
- * Calculate signal statistics
+ * Statistics on absolute ADC voltage waveform (each sample scaled to mV).
  */
 export function calculateStats(data: SensorData[]): {
   min: number;
@@ -128,7 +134,7 @@ export function calculateStats(data: SensorData[]): {
     return { min: 0, max: 0, mean: 0, stdDev: 0 };
   }
 
-  const values = data.map(d => d.emg);
+  const values = data.map((d) => rawEmgToMv(d.emg));
   const min = Math.min(...values);
   const max = Math.max(...values);
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
@@ -136,8 +142,8 @@ export function calculateStats(data: SensorData[]): {
   const stdDev = Math.sqrt(variance);
 
   return {
-    min,
-    max,
+    min: Math.round(min * 100) / 100,
+    max: Math.round(max * 100) / 100,
     mean: Math.round(mean * 100) / 100,
     stdDev: Math.round(stdDev * 100) / 100,
   };

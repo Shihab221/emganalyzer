@@ -40,6 +40,7 @@ export function FFTDisplay({ data }: FFTDisplayProps) {
           </p>
           <p className="text-lg font-bold text-cyan-500">
             {payload[0].value.toFixed(1)}
+            <span className="text-xs font-normal ml-1">mV</span>
           </p>
         </div>
       );
@@ -59,7 +60,7 @@ export function FFTDisplay({ data }: FFTDisplayProps) {
               FFT Analysis
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Frequency spectrum of EMG signal
+              DFT magnitude on AC mV samples (excluding DC bin for peak readout)
             </p>
           </div>
         </div>

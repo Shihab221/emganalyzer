@@ -30,8 +30,8 @@ export interface PatientProfile {
 
 /**
  * Sensor data structure received from ESP32
- * - emg: Raw EMG sensor reading (0-4095 for 12-bit ADC)
- * - timestamp: Unix timestamp in milliseconds
+ * - emg: Raw 12‑bit ADC count (0–4095). Charts / RMS / FFT / CSV convert to millivolts via `lib/emg-calibration`.
+ * - timestamp: Unix milliseconds (server wall-clock)
  */
 export interface SensorData {
   emg: number;

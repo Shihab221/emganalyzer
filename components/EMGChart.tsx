@@ -1,14 +1,6 @@
 'use client';
 
-// ============================================
-// EMG Chart Component
-// Real-time line chart for EMG muscle signal data
-// Uses Recharts for smooth, responsive visualization
-// ============================================
-
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,30 +11,48 @@ import {
 } from 'recharts';
 import { Activity, Zap } from 'lucide-react';
 import { ChartDataPoint } from '@/lib/types';
+import { rawEmgToMv, EMG_ADC_FULL_SCALE_MV } from '@/lib/emg-calibration';
 
 interface EMGChartProps {
   data: ChartDataPoint[];
-  currentValue: number;
+  /** Prefer latest instantaneous mV shown in header when live count is ahead of `data` */
+  currentMv?: number | null;
 }
 
-export function EMGChart({ data, currentValue }: EMGChartProps) {
-  // Custom tooltip component
+export function EMGChart({ data, currentMv }: EMGChartProps) {
+  const plotData =
+    data.length === 0
+      ? []
+      : data.map((row) => ({
+          ...row,
+          emgMv: rawEmgToMv(row.emg),
+        }));
+
+  const displayMv =
+    currentMv != null
+      ? Math.round(currentMv * 100) / 100
+      : plotData.length > 0
+        ? plotData[plotData.length - 1].emgMv
+        : 0;
+
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      const row = payload[0].payload as ChartDataPoint;
-      const when = typeof row.timestamp === 'number'
-        ? new Intl.DateTimeFormat(undefined, {
-            dateStyle: 'medium',
-            timeStyle: 'medium',
-            hour12: false,
-          }).format(row.timestamp)
-        : payload[0].label;
+      const row = payload[0].payload as ChartDataPoint & { emgMv?: number };
+      const when =
+        typeof row.timestamp === 'number'
+          ? new Intl.DateTimeFormat(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'medium',
+              hour12: false,
+            }).format(row.timestamp)
+          : payload[0].label;
+      const mv = payload[0].value ?? row.emgMv;
       return (
         <div className="glass-card-sm !p-3 !rounded-lg shadow-xl border border-red-500/20">
           <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">{when}</p>
           <p className="text-lg font-bold text-red-500">
-            {payload[0].value}
-            <span className="text-xs font-normal ml-1">raw</span>
+            {mv != null ? Number(mv).toFixed(2) : '—'}
+            <span className="text-xs font-normal ml-1">mV</span>
           </p>
         </div>
       );
@@ -52,7 +62,6 @@ export function EMGChart({ data, currentValue }: EMGChartProps) {
 
   return (
     <div className="glass-card animate-in">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 shadow-lg">
@@ -60,53 +69,49 @@ export function EMGChart({ data, currentValue }: EMGChartProps) {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
-              EMG Muscle Signal
+              EMG muscle signal
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Real-time electromyography data
+              ADC waveform scaled to mV (counts → {(EMG_ADC_FULL_SCALE_MV).toLocaleString()} mV FS)
             </p>
           </div>
         </div>
 
-        {/* Current Value Display */}
         <div className="text-right">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-red-500" />
             <span className="text-2xl sm:text-3xl font-bold text-red-500">
-              {currentValue}
+              {displayMv.toFixed(1)}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Current Value (0-4095)
+            Latest (instantaneous · mV)
           </p>
         </div>
       </div>
 
-      {/* Chart */}
       <div className="h-64 sm:h-80">
-        {data.length === 0 ? (
-          // Empty state
+        {plotData.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-400">
             <Activity className="w-12 h-12 mb-3 opacity-50" />
-            <p className="text-sm">Waiting for EMG data...</p>
+            <p className="text-sm">Waiting for EMG data…</p>
             <p className="text-xs mt-1">Connect your ESP32 to start</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={data}
+              data={plotData}
               margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
             >
-              {/* Gradient definition for area fill */}
               <defs>
                 <linearGradient id="emgGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
                   <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              
+
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              
+
               <XAxis
                 dataKey="time"
                 tick={{ fontSize: 11 }}
@@ -114,21 +119,20 @@ export function EMGChart({ data, currentValue }: EMGChartProps) {
                 axisLine={false}
                 interval="preserveStartEnd"
               />
-              
+
               <YAxis
-                domain={[0, 4095]}
+                domain={[0, Math.round(EMG_ADC_FULL_SCALE_MV * 100) / 100]}
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${value}`}
+                tickFormatter={(v) => `${v}`}
               />
-              
+
               <Tooltip content={<CustomTooltip />} />
-              
-              {/* Area under the line */}
+
               <Area
                 type="monotone"
-                dataKey="emg"
+                dataKey="emgMv"
                 stroke="#ef4444"
                 strokeWidth={2}
                 fill="url(#emgGradient)"
@@ -139,10 +143,9 @@ export function EMGChart({ data, currentValue }: EMGChartProps) {
         )}
       </div>
 
-      {/* Chart Legend */}
       <div className="mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
         <div className="flex flex-wrap gap-2 justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>ADC range: 0 – 4095 (12‑bit)</span>
+          <span>Vertical axis: mV ({EMG_ADC_FULL_SCALE_MV.toLocaleString()} mV FS · 4095 counts)</span>
           <span>Axis / tooltips use device local date &amp; time</span>
         </div>
       </div>
@@ -150,9 +153,6 @@ export function EMGChart({ data, currentValue }: EMGChartProps) {
   );
 }
 
-// ============================================
-// Loading skeleton for EMG chart
-// ============================================
 export function EMGChartSkeleton() {
   return (
     <div className="glass-card animate-pulse">
