@@ -3,16 +3,38 @@
 // ============================================
 
 /**
+ * User roles
+ */
+export type UserRole = 'doctor' | 'patient';
+
+/**
+ * User authentication data
+ */
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  createdAt: number;
+}
+
+/**
+ * Patient profile information (for patients only)
+ */
+export interface PatientProfile {
+  userId: string;
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  medicalNotes?: string;
+}
+
+/**
  * Sensor data structure received from ESP32
  * - emg: Raw EMG sensor reading (0-4095 for 12-bit ADC)
- * - ax, ay, az: Accelerometer values in g (gravitational units)
  * - timestamp: Unix timestamp in milliseconds
  */
 export interface SensorData {
   emg: number;
-  ax: number;
-  ay: number;
-  az: number;
   timestamp: number;
 }
 
@@ -20,7 +42,34 @@ export interface SensorData {
  * Data point for charts with formatted time
  */
 export interface ChartDataPoint extends SensorData {
-  time: string; // Formatted time for chart labels
+  time: string;
+}
+
+/**
+ * Session data for a patient's EMG recording
+ */
+export interface EMGSession {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientAge?: number;
+  patientGender?: string;
+  startTime: number;
+  endTime?: number;
+  data: SensorData[];
+  isActive: boolean;
+}
+
+/**
+ * Doctor's comment on a session
+ */
+export interface DoctorComment {
+  id: string;
+  sessionId: string;
+  doctorId: string;
+  doctorName: string;
+  content: string;
+  timestamp: number;
 }
 
 /**
@@ -32,4 +81,59 @@ export interface ApiResponse {
   data?: SensorData | SensorData[];
   latest?: SensorData | null;
   history?: SensorData[];
+}
+
+/**
+ * Auth response structure
+ */
+export interface AuthResponse {
+  success: boolean;
+  message?: string;
+  user?: User;
+  token?: string;
+}
+
+/**
+ * Login credentials
+ */
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+/**
+ * Registration data
+ */
+export interface RegisterData extends LoginCredentials {
+  name: string;
+  role: UserRole;
+  age?: number;
+  gender?: 'male' | 'female' | 'other';
+}
+
+/**
+ * CSV export data
+ */
+export interface CSVExportData {
+  filename: string;
+  data: string;
+  timestamp: number;
+}
+
+/**
+ * RMS (Root Mean Square) calculation result
+ */
+export interface RMSData {
+  value: number;
+  windowSize: number;
+  timestamp: number;
+}
+
+/**
+ * FFT (Fast Fourier Transform) result
+ */
+export interface FFTData {
+  frequencies: number[];
+  magnitudes: number[];
+  dominantFrequency: number;
 }

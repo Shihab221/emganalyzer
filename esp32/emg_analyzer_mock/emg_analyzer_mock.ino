@@ -1,11 +1,10 @@
 /*
  * ============================================
- * EMG Analyzer - ESP32 Mock Data Code
+ * EMG Analyzer - ESP32 Raw EMG Only
  * ============================================
  * 
- * Use this code FIRST to test your setup!
- * It sends realistic mock sensor data to the server
- * without needing actual sensors connected.
+ * Simplified version that sends only raw EMG data.
+ * No MPU6050/accelerometer data.
  * 
  * How to use:
  * 1. Install ESP32 board in Arduino IDE
@@ -33,72 +32,83 @@ const char* WIFI_PASSWORD = "25388206"; // <-- Change this!
 // Server URL - Change to your computer's IP when testing locally
 // Example: "http://192.168.1.100:3000/api/sensor-data"
 // For Vercel deployment: "https://your-app.vercel.app/api/sensor-data"
-const char* SERVER_URL = "http://192.168.1.100:3000/api/sensor-data"; // <-- Change this!
+const char* SERVER_URL = "https://emganalyzer.vercel.app/api/sensor-data"; // <-- Change this!
 
 // How often to send data (in milliseconds)
 const int SEND_INTERVAL = 500;  // 500ms = 2 times per second
 
+// EMG Sensor Pin (ADC)
+const int EMG_PIN = 34;  // GPIO 34 for real EMG sensor
+
+// Use mock data for testing (set to false when using real sensor)
+const bool USE_MOCK_DATA = true;
+
 // ============================================
-// Variables for mock data generation
+// Variables
 // ============================================
 unsigned long lastSendTime = 0;
-float emgPhase = 0;      // For generating realistic EMG waves
-float motionPhase = 0;   // For generating motion patterns
+float emgPhase = 0;  // For generating realistic EMG waves (mock mode)
 
 // LED for status indication (built-in LED on most ESP32 boards)
 const int LED_PIN = 2;
 
 // ============================================
 // SETUP FUNCTION
-// Runs once when ESP32 starts
 // ============================================
 void setup() {
-  // Start Serial communication for debugging
   Serial.begin(115200);
-  delay(1000);  // Wait for serial to initialize
+  delay(1000);
   
   Serial.println();
   Serial.println("========================================");
-  Serial.println("   EMG Analyzer - Mock Data Mode");
+  Serial.println("   EMG Analyzer - Raw EMG Only");
   Serial.println("========================================");
   Serial.println();
   
-  // Setup LED pin
+  if (USE_MOCK_DATA) {
+    Serial.println("MODE: Mock Data (for testing)");
+  } else {
+    Serial.println("MODE: Real EMG Sensor");
+    Serial.print("EMG Pin: GPIO ");
+    Serial.println(EMG_PIN);
+  }
+  Serial.println();
+  
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   
-  // Connect to WiFi
+  if (!USE_MOCK_DATA) {
+    pinMode(EMG_PIN, INPUT);
+  }
+  
   connectToWiFi();
 }
 
 // ============================================
 // MAIN LOOP
-// Runs continuously after setup
 // ============================================
 void loop() {
-  // Check if WiFi is still connected
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi disconnected! Reconnecting...");
     connectToWiFi();
   }
   
-  // Check if it's time to send data
   unsigned long currentTime = millis();
   if (currentTime - lastSendTime >= SEND_INTERVAL) {
     lastSendTime = currentTime;
     
-    // Generate mock sensor data
-    int emgValue = generateMockEMG();
-    float ax = generateMockAccelX();
-    float ay = generateMockAccelY();
-    float az = generateMockAccelZ();
+    int emgValue;
+    if (USE_MOCK_DATA) {
+      emgValue = generateMockEMG();
+    } else {
+      emgValue = analogRead(EMG_PIN);
+    }
     
-    // Send data to server
-    sendSensorData(emgValue, ax, ay, az);
+    sendEMGData(emgValue);
     
-    // Update phases for next iteration
-    emgPhase += 0.3;
-    motionPhase += 0.1;
+    if (USE_MOCK_DATA) {
+      emgPhase += 0.3;
+    }
   }
 }
 
@@ -111,10 +121,9 @@ void connectToWiFi() {
   
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
-  // Blink LED while connecting
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    digitalWrite(LED_PIN, !digitalRead(LED_PIN));  // Toggle LED
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
     delay(500);
     Serial.print(".");
     attempts++;
@@ -126,8 +135,7 @@ void connectToWiFi() {
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
     Serial.println();
-    
-    digitalWrite(LED_PIN, HIGH);  // LED on = connected
+    digitalWrite(LED_PIN, HIGH);
   } else {
     Serial.println();
     Serial.println("Failed to connect to WiFi!");
@@ -137,83 +145,39 @@ void connectToWiFi() {
 }
 
 // ============================================
-// Mock Data Generation Functions
-// These create realistic-looking sensor data
+// Mock EMG Data Generation (for testing)
 // ============================================
-
-// Generate mock EMG data (0-4095 range, like real ADC)
-// Creates a wave pattern with some random noise
 int generateMockEMG() {
-  // Base wave (simulates muscle activity pattern)
   float baseWave = sin(emgPhase) * 800;
-  
-  // Add some higher frequency components (muscle tremor simulation)
   float tremor = sin(emgPhase * 5) * 200;
-  
-  // Add random noise (like real EMG signals)
   float noise = random(-150, 150);
   
-  // Combine and shift to positive range
   int emgValue = 2048 + (int)(baseWave + tremor + noise);
-  
-  // Clamp to valid ADC range (0-4095)
   emgValue = constrain(emgValue, 0, 4095);
   
   return emgValue;
 }
 
-// Generate mock X-axis acceleration (left/right movement)
-float generateMockAccelX() {
-  // Gentle swaying motion
-  float ax = sin(motionPhase * 0.7) * 0.5;
-  ax += (random(-10, 10) / 100.0);  // Small noise
-  return ax;
-}
-
-// Generate mock Y-axis acceleration (forward/back movement)
-float generateMockAccelY() {
-  // Different frequency for Y axis
-  float ay = cos(motionPhase * 0.5) * 0.3;
-  ay += (random(-10, 10) / 100.0);  // Small noise
-  return ay;
-}
-
-// Generate mock Z-axis acceleration (up/down, includes gravity ~9.81)
-float generateMockAccelZ() {
-  // Z axis shows gravity plus small movements
-  float az = 9.81 + sin(motionPhase * 0.3) * 0.2;
-  az += (random(-5, 5) / 100.0);  // Small noise
-  return az;
-}
-
 // ============================================
-// Send Data to Server
+// Send EMG Data to Server
 // ============================================
-void sendSensorData(int emg, float ax, float ay, float az) {
-  // Create HTTP client
+void sendEMGData(int emg) {
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
   
-  // Create JSON document
-  StaticJsonDocument<200> doc;
+  StaticJsonDocument<100> doc;
   doc["emg"] = emg;
-  doc["ax"] = ax;
-  doc["ay"] = ay;
-  doc["az"] = az;
-  doc["timestamp"] = millis();  // Use millis as timestamp
+  doc["timestamp"] = millis();
   
-  // Serialize JSON to string
   String jsonString;
   serializeJson(doc, jsonString);
   
-  // Send POST request
   Serial.print("Sending: ");
   Serial.println(jsonString);
   
   int httpResponseCode = http.POST(jsonString);
   
-  // Check response
   if (httpResponseCode > 0) {
     String response = http.getString();
     Serial.print("Response (");
@@ -221,7 +185,6 @@ void sendSensorData(int emg, float ax, float ay, float az) {
     Serial.print("): ");
     Serial.println(response);
     
-    // Blink LED to show successful send
     digitalWrite(LED_PIN, LOW);
     delay(50);
     digitalWrite(LED_PIN, HIGH);
@@ -231,9 +194,7 @@ void sendSensorData(int emg, float ax, float ay, float az) {
     Serial.print(" (");
     Serial.print(HTTPClient::errorToString(httpResponseCode));
     Serial.println(")");
-    Serial.println("Hint: server must be reachable at SERVER_URL (same WiFi, correct IP, port matches npm run dev).");
     
-    // Double blink for error
     digitalWrite(LED_PIN, LOW);
     delay(100);
     digitalWrite(LED_PIN, HIGH);
@@ -243,7 +204,7 @@ void sendSensorData(int emg, float ax, float ay, float az) {
     digitalWrite(LED_PIN, HIGH);
   }
   
-  http.end();  // Clean up
+  http.end();
   Serial.println("---");
 }
 
@@ -255,27 +216,14 @@ void sendSensorData(int emg, float ax, float ay, float az) {
  * 1. "WiFi not connecting"
  *    - Double-check SSID and password (case-sensitive!)
  *    - Make sure you're using 2.4GHz WiFi (ESP32 doesn't support 5GHz)
- *    - Try moving closer to the router
  * 
  * 2. "Error sending data"
  *    - Make sure the server is running (npm run dev)
  *    - Check that SERVER_URL is correct
  *    - If testing locally, use your computer's local IP (not localhost)
- *    - Find your IP: Windows (ipconfig), Mac/Linux (ifconfig)
  * 
- * 3. "Serial Monitor shows garbage"
- *    - Set baud rate to 115200 in Serial Monitor
- * 
- * 4. "LED not blinking"
- *    - Some ESP32 boards have LED on different pins
- *    - Try changing LED_PIN to 5, 13, or check your board docs
- * 
- * ============================================
- * NEXT STEPS
- * ============================================
- * 
- * Once this mock code works:
- * 1. Open the web dashboard and see the charts update
- * 2. Move to the real sensor code (emg_analyzer_real.ino)
- * 3. Connect actual EMG and MPU6050 sensors
+ * 3. "Using Real EMG Sensor"
+ *    - Set USE_MOCK_DATA to false
+ *    - Connect EMG sensor output to GPIO 34
+ *    - Make sure sensor has proper power supply
  */

@@ -1,7 +1,7 @@
 {
   "name": "emganalyzer",
   "version": "1.0.0",
-  "description": "Real-time EMG and MPU6050 sensor data visualization dashboard",
+  "description": "Real-time EMG sensor data visualization dashboard with doctor and patient roles",
   "private": true,
   "engines": {
     "node": ">=18.18.0"

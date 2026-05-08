@@ -72,7 +72,7 @@ export function SensorCard({
           <p className="sensor-label">{title}</p>
           <div className="flex items-baseline justify-end gap-1">
             <span className={`sensor-value ${colors.text}`}>
-              {typeof value === 'number' ? value.toFixed(2) : value}
+              {typeof value === 'number' ? (Number.isInteger(value) ? value : value.toFixed(2)) : value}
             </span>
             {unit && <span className="sensor-unit">{unit}</span>}
           </div>

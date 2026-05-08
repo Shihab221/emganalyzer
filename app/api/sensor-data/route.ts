@@ -5,76 +5,57 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { SensorData, ApiResponse } from '@/lib/types';
+import {
+  addSensorData,
+  getSensorHistory,
+  getLatestData,
+  getOrCreateSession,
+  currentPatientId,
+  patientProfiles,
+  users,
+} from '@/lib/store';
 
-/** Node.js runtime for in-memory history (not Edge). */
 export const runtime = 'nodejs';
-/** Always run on the server; never statically cache responses. */
 export const dynamic = 'force-dynamic';
-
-// ============================================
-// In-Memory Data Storage
-// Keeps the last 100 data points for charting
-// Note: This resets when the server restarts
-// For production, consider using a database
-// ============================================
-const MAX_HISTORY_SIZE = 100;
-let sensorHistory: SensorData[] = [];
-let latestData: SensorData | null = null;
 
 /**
  * POST /api/sensor-data
  * Receives sensor data from ESP32
- * 
- * Expected JSON body:
- * {
- *   "emg": 2456,
- *   "ax": 0.45,
- *   "ay": -1.23,
- *   "az": 9.81,
- *   "timestamp": 123456789
- * }
  */
 export async function POST(request: NextRequest) {
   try {
-    // Parse the incoming JSON data
-    const data: SensorData = await request.json();
-    
-    // Validate required fields
-    if (
-      typeof data.emg !== 'number' ||
-      typeof data.ax !== 'number' ||
-      typeof data.ay !== 'number' ||
-      typeof data.az !== 'number'
-    ) {
+    const data = await request.json();
+
+    if (typeof data.emg !== 'number') {
       return NextResponse.json(
-        { success: false, message: 'Invalid data format. Required: emg, ax, ay, az (numbers)' } as ApiResponse,
+        { success: false, message: 'Invalid data format. Required: emg (number)' } as ApiResponse,
         { status: 400 }
       );
     }
-    
-    // Add timestamp if not provided
-    if (!data.timestamp) {
-      data.timestamp = Date.now();
+
+    const sensorData: SensorData = {
+      emg: data.emg,
+      timestamp: data.timestamp || Date.now(),
+    };
+
+    addSensorData(sensorData);
+
+    if (currentPatientId) {
+      const user = Array.from(users.values()).find(u => u.id === currentPatientId);
+      const profile = patientProfiles.get(currentPatientId);
+      if (user) {
+        const session = getOrCreateSession(currentPatientId, user.name, profile);
+        session.data.push(sensorData);
+      }
     }
-    
-    // Store the latest data
-    latestData = data;
-    
-    // Add to history (keep last MAX_HISTORY_SIZE entries)
-    sensorHistory.push(data);
-    if (sensorHistory.length > MAX_HISTORY_SIZE) {
-      sensorHistory.shift(); // Remove oldest entry
-    }
-    
-    // Log for debugging (optional - remove in production)
-    console.log(`📊 Received: EMG=${data.emg}, Ax=${data.ax.toFixed(2)}, Ay=${data.ay.toFixed(2)}, Az=${data.az.toFixed(2)}`);
-    
+
+    console.log(`📊 Received: EMG=${data.emg}`);
+
     return NextResponse.json({
       success: true,
       message: 'Data received successfully',
-      data: latestData,
+      data: sensorData,
     } as ApiResponse);
-    
   } catch (error) {
     console.error('Error processing sensor data:', error);
     return NextResponse.json(
@@ -87,17 +68,12 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/sensor-data
  * Returns latest data and history for the dashboard
- * 
- * Response:
- * {
- *   "success": true,
- *   "latest": { emg, ax, ay, az, timestamp },
- *   "history": [ ... last 100 data points ... ]
- * }
  */
 export async function GET() {
   try {
-    // If no data yet, return empty response
+    const latestData = getLatestData();
+    const history = getSensorHistory();
+
     if (!latestData) {
       return NextResponse.json({
         success: true,
@@ -106,13 +82,12 @@ export async function GET() {
         history: [],
       } as ApiResponse);
     }
-    
+
     return NextResponse.json({
       success: true,
       latest: latestData,
-      history: sensorHistory,
+      history: history.slice(-100),
     } as ApiResponse);
-    
   } catch (error) {
     console.error('Error fetching sensor data:', error);
     return NextResponse.json(
@@ -124,7 +99,6 @@ export async function GET() {
 
 /**
  * OPTIONS handler for CORS preflight requests
- * Allows ESP32 to send data from different origin
  */
 export async function OPTIONS() {
   return new NextResponse(null, {

@@ -34,7 +34,7 @@ export function Header() {
                 EMG Analyzer
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
-                Real-time Muscle & Motion Monitor
+                Real-time Muscle Signal Monitor
               </p>
             </div>
           </div>
