@@ -9,6 +9,7 @@ import {
   endRecording,
   getRecordingState,
 } from '@/lib/db';
+import { setRecordingSessionId, flushRecordingBatch } from '@/lib/stream-ingest';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,8 @@ export async function POST(request: NextRequest) {
         bmi: profile.bmi,
       } : undefined);
 
+      setRecordingSessionId(session.id);
+
       return NextResponse.json({
         success: true,
         recording: true,
@@ -99,7 +102,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    await flushRecordingBatch(true);
     const session = await endRecording(user.id);
+    setRecordingSessionId(null);
     if (!session) {
       return NextResponse.json(
         { success: false, message: 'No active recording for this patient' },

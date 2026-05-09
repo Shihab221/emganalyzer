@@ -6,11 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@/lib/types';
 import {
-  addLiveSensorSample,
-  appendToActiveRecording,
-  getLiveSensorHistory,
-  getLatestLiveSensorData,
-} from '@/lib/db';
+  pushLiveSample,
+  getLiveHistory,
+  getLatestLive,
+  enqueueRecordingSample,
+} from '@/lib/stream-ingest';
+import { getLatestLiveSensorData, getLiveSensorHistory } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,22 +22,18 @@ export async function POST(request: NextRequest) {
 
     // Support batch mode: array of samples or single sample
     const samples = Array.isArray(data) ? data : [data];
-    
+
     for (const sample of samples) {
       if (typeof sample.emg !== 'number') {
-        continue; // Skip invalid samples
+        continue;
       }
 
+      const serverNow = Date.now();
       const emgValue = sample.emg;
-      
-      // Add to live display buffer and active recording (if any)
-      await Promise.all([
-        addLiveSensorSample(emgValue),
-        appendToActiveRecording(emgValue),
-      ]);
-    }
 
-    console.log(`📊 Received ${samples.length} sample(s), last EMG=${samples[samples.length - 1]?.emg}`);
+      pushLiveSample({ emg: emgValue, timestamp: serverNow });
+      await enqueueRecordingSample(emgValue, serverNow);
+    }
 
     return NextResponse.json({
       success: true,
@@ -52,10 +49,14 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const [latest, history] = await Promise.all([
-      getLatestLiveSensorData(),
-      getLiveSensorHistory(300), // Get last 300 samples for smooth display
-    ]);
+    let latest = getLatestLive();
+    let history = getLiveHistory(300);
+
+    // Cold instance or empty ring: fall back to DB-backed buffer (legacy / multi-instance)
+    if (!latest) {
+      latest = await getLatestLiveSensorData();
+      history = await getLiveSensorHistory(300);
+    }
 
     if (!latest) {
       return NextResponse.json({
