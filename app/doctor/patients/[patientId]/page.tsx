@@ -4,9 +4,21 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Header } from '@/components/Header';
-import { EMGSession } from '@/lib/types';
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, History, ChevronRight } from 'lucide-react';
+
+interface SessionListItem {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientAge?: number;
+  patientGender?: string;
+  startTime: number;
+  endTime?: number;
+  isActive: boolean;
+  dataCount?: number;
+  data?: { emg: number; timestamp: number }[];
+}
 
 interface PatientRow {
   id: string;
@@ -14,8 +26,9 @@ interface PatientRow {
   email: string;
   age?: number;
   gender?: string;
-  heightCm?: number;
+  heightM?: number;
   weightKg?: number;
+  bmi?: number;
   isRecording: boolean;
 }
 
@@ -25,7 +38,7 @@ export default function DoctorPatientSessionsPage() {
   const patientId = typeof params?.patientId === 'string' ? params.patientId : '';
   const { user, isLoading: authLoading, isDoctor } = useAuth();
   const [patient, setPatient] = useState<PatientRow | null>(null);
-  const [sessions, setSessions] = useState<EMGSession[]>([]);
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -39,7 +52,7 @@ export default function DoctorPatientSessionsPage() {
       const sjson = await srs.json();
       const p = (pjson.patients as PatientRow[] | undefined)?.find((x) => x.id === patientId);
       setPatient(p ?? null);
-      setSessions(sjson.success ? (sjson.sessions as EMGSession[]) ?? [] : []);
+      setSessions(sjson.success ? (sjson.sessions as SessionListItem[]) ?? [] : []);
     } finally {
       setLoading(false);
     }
@@ -62,7 +75,7 @@ export default function DoctorPatientSessionsPage() {
     return () => clearInterval(t);
   }, [fetchData]);
 
-  const formatRange = (s: EMGSession) => {
+  const formatRange = (s: SessionListItem) => {
     const start = new Intl.DateTimeFormat(undefined, {
       dateStyle: 'medium',
       timeStyle: 'medium',
@@ -74,7 +87,7 @@ export default function DoctorPatientSessionsPage() {
     return `${start} → ${endLabel}`;
   };
 
-  const durationSec = (s: EMGSession) => {
+  const durationSec = (s: SessionListItem) => {
     const end = s.endTime ?? (s.isActive ? Date.now() : s.startTime);
     return Math.max(0, Math.floor((end - s.startTime) / 1000));
   };
@@ -118,8 +131,9 @@ export default function DoctorPatientSessionsPage() {
             <p className="mt-1">
               {patient.age != null && <span>{patient.age} yrs</span>}
               {patient.gender && <span className="capitalize ml-3">{patient.gender}</span>}
-              {patient.heightCm != null && <span className="ml-3">{patient.heightCm} cm</span>}
+              {patient.heightM != null && <span className="ml-3">{patient.heightM} m</span>}
               {patient.weightKg != null && <span className="ml-3">{patient.weightKg} kg</span>}
+              {patient.bmi != null && <span className="ml-3">BMI {patient.bmi}</span>}
               {patient.isRecording && (
                 <span className="ml-3 text-green-600 dark:text-green-400 font-medium">
                   Currently recording
@@ -153,7 +167,7 @@ export default function DoctorPatientSessionsPage() {
                       )}
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
-                      {s.data.length} samples • {durationSec(s)} s
+                      {s.dataCount ?? s.data?.length ?? 0} samples • {durationSec(s)} s
                     </p>
                   </div>
                   <span className="inline-flex items-center gap-1 text-sm text-red-500 font-medium">

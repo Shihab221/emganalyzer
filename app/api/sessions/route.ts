@@ -6,9 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getAllSessions,
   getPatientSessions,
-  activeSessions,
   getSessionById,
-} from '@/lib/store';
+} from '@/lib/db';
+import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const sessionId = searchParams.get('sessionId');
 
     if (sessionId) {
-      const session = getSessionById(sessionId);
+      const session = await getSessionById(sessionId);
       if (!session) {
         return NextResponse.json({ success: false, message: 'Session not found' }, { status: 404 });
       }
@@ -30,12 +30,13 @@ export async function GET(request: NextRequest) {
 
     let sessionList;
     if (patientId) {
-      sessionList = getPatientSessions(patientId);
+      sessionList = await getPatientSessions(patientId);
     } else {
-      sessionList = getAllSessions();
+      sessionList = await getAllSessions();
     }
 
-    const activePatientIds = Array.from(activeSessions.keys());
+    const activeRecordings = await prisma.activeRecording.findMany();
+    const activePatientIds = activeRecordings.map((r) => r.patientId);
 
     return NextResponse.json({
       success: true,

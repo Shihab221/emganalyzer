@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionById } from '@/lib/store';
+import { getSessionById } from '@/lib/db';
 import { buildEmgCsvWithAnalysis } from '@/lib/emg-csv';
 
 export const runtime = 'nodejs';
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const session = getSessionById(sessionId);
+    const session = await getSessionById(sessionId);
     const data = session?.data;
     if (!data || data.length === 0) {
       return NextResponse.json({ success: false, message: 'Session not found or empty' }, { status: 404 });
@@ -27,10 +27,11 @@ export async function GET(request: NextRequest) {
 
     const csv = buildEmgCsvWithAnalysis(data, {
       patientName: session.patientName,
-      patientAge: session.patientAge,
-      patientGender: session.patientGender,
-      patientHeightCm: session.patientHeightCm,
-      patientWeightKg: session.patientWeightKg,
+      patientAge: session.patientAge ?? undefined,
+      patientGender: session.patientGender ?? undefined,
+      patientHeightM: session.patientHeightM ?? undefined,
+      patientWeightKg: session.patientWeightKg ?? undefined,
+      patientBmi: session.patientBmi ?? undefined,
     });
     const safeId = sessionId.replace(/[^\w.-]+/g, '_').slice(0, 120);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');

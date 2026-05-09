@@ -17,7 +17,7 @@ interface AuthContextType {
     role: UserRole;
     age?: number;
     gender?: 'male' | 'female' | 'other';
-    heightCm?: number;
+    heightM?: number;
     weightKg?: number;
   }) => Promise<{ success: boolean; message?: string; user?: User }>;
   logout: () => void;
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: UserRole;
     age?: number;
     gender?: 'male' | 'female' | 'other';
-    heightCm?: number;
+    heightM?: number;
     weightKg?: number;
   }) => {
     try {

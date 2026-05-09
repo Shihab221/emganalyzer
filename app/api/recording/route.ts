@@ -3,49 +3,56 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import {
-  patientProfiles,
   startRecording,
   endRecording,
   getRecordingState,
-  users,
-} from '@/lib/store';
+} from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function findPatient(userIdOrEmail?: string): { ok: boolean; patientId?: string; name?: string; message?: string } {
+async function findPatient(userIdOrEmail?: string) {
   if (!userIdOrEmail) {
     return { ok: false, message: 'patientId required' };
   }
-  let u = Array.from(users.values()).find((x) => x.id === userIdOrEmail);
-  if (!u) {
-    u = users.get(userIdOrEmail.toLowerCase());
+
+  let user = await prisma.user.findUnique({
+    where: { id: userIdOrEmail },
+    include: { patientProfile: true },
+  });
+
+  if (!user) {
+    user = await prisma.user.findUnique({
+      where: { email: userIdOrEmail.toLowerCase() },
+      include: { patientProfile: true },
+    });
   }
-  if (!u || u.role !== 'patient') {
+
+  if (!user || user.role !== 'patient') {
     return { ok: false, message: 'Patient not found' };
   }
-  return { ok: true, patientId: u.id, name: u.name };
+
+  return { ok: true, user };
 }
 
 /** GET recording status */
 export async function GET(request: NextRequest) {
   const patientId = request.nextUrl.searchParams.get('patientId');
-  const found = findPatient(patientId || undefined);
-  if (!patientId || !found.ok || !found.patientId) {
+  const found = await findPatient(patientId || undefined);
+  
+  if (!patientId || !found.ok || !found.user) {
     return NextResponse.json({ success: false, recording: false, session: null });
   }
 
-  const state = getRecordingState();
-  const active =
-    !!state &&
-    state.patientId === found.patientId;
+  const state = await getRecordingState(found.user.id);
 
   return NextResponse.json({
     success: true,
-    recording: active,
-    startedAt: active ? state?.startedAt : null,
-    sessionId: active ? state?.sessionId : null,
+    recording: !!state,
+    startedAt: state?.startedAt ?? null,
+    sessionId: state?.sessionId ?? null,
   });
 }
 
@@ -56,13 +63,15 @@ export async function POST(request: NextRequest) {
     const patientIdRaw = body.patientId as string | undefined;
     const action = body.action as string | undefined;
 
-    const found = findPatient(patientIdRaw);
-    if (!found.ok || !found.patientId || !found.name) {
+    const found = await findPatient(patientIdRaw);
+    if (!found.ok || !found.user) {
       return NextResponse.json(
         { success: false, message: found.message || 'Patient not found' },
         { status: 400 }
       );
     }
+
+    const user = found.user;
 
     if (action !== 'start' && action !== 'stop') {
       return NextResponse.json(
@@ -72,18 +81,25 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'start') {
-      const profile = patientProfiles.get(found.patientId);
-      const session = startRecording(found.patientId, found.name, profile);
+      const profile = user.patientProfile;
+      const session = await startRecording(user.id, user.name, profile ? {
+        age: profile.age,
+        gender: profile.gender,
+        heightM: profile.heightM,
+        weightKg: profile.weightKg,
+        bmi: profile.bmi,
+      } : undefined);
+
       return NextResponse.json({
         success: true,
         recording: true,
         sessionId: session.id,
-        startedAt: session.startTime,
+        startedAt: session.startTime instanceof Date ? session.startTime.getTime() : session.startTime,
         session,
       });
     }
 
-    const session = endRecording(found.patientId);
+    const session = await endRecording(user.id);
     if (!session) {
       return NextResponse.json(
         { success: false, message: 'No active recording for this patient' },

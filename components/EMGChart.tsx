@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { Activity, Zap } from 'lucide-react';
 import { ChartDataPoint } from '@/lib/types';
-import { rawEmgToMv, EMG_ADC_FULL_SCALE_MV } from '@/lib/emg-calibration';
+import { rawEmgToMv } from '@/lib/emg-calibration';
 
 interface EMGChartProps {
   data: ChartDataPoint[];
@@ -72,7 +72,7 @@ export function EMGChart({ data, currentMv }: EMGChartProps) {
               EMG muscle signal
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              ADC waveform scaled to mV (counts → {(EMG_ADC_FULL_SCALE_MV).toLocaleString()} mV FS)
+              EMG waveform (0–5 mV range)
             </p>
           </div>
         </div>
@@ -121,11 +121,12 @@ export function EMGChart({ data, currentMv }: EMGChartProps) {
               />
 
               <YAxis
-                domain={[0, Math.round(EMG_ADC_FULL_SCALE_MV * 100) / 100]}
+                domain={[0, 5]}
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v) => `${v}`}
+                ticks={[0, 1, 2, 3, 4, 5]}
               />
 
               <Tooltip content={<CustomTooltip />} />
@@ -145,7 +146,7 @@ export function EMGChart({ data, currentMv }: EMGChartProps) {
 
       <div className="mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
         <div className="flex flex-wrap gap-2 justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>Vertical axis: mV ({EMG_ADC_FULL_SCALE_MV.toLocaleString()} mV FS · 4095 counts)</span>
+          <span>Vertical axis: 0–5 mV (EMG signal range)</span>
           <span>Axis / tooltips use device local date &amp; time</span>
         </div>
       </div>

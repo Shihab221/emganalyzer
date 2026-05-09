@@ -19,6 +19,7 @@ import {
   LogOut,
   Play,
   Square,
+  UserRound,
 } from 'lucide-react';
 
 function formatChartAxis(timestamp: number): string {
@@ -30,6 +31,16 @@ function formatChartAxis(timestamp: number): string {
     second: '2-digit',
     hour12: false,
   }).format(timestamp);
+}
+
+interface PatientDashboardProfile {
+  name: string;
+  email: string;
+  age?: number;
+  gender?: string;
+  heightM?: number;
+  weightKg?: number;
+  bmi?: number;
 }
 
 export default function DashboardPage() {
@@ -49,6 +60,7 @@ export default function DashboardPage() {
   const [lastCompletedSessionId, setLastCompletedSessionId] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [patientProfile, setPatientProfile] = useState<PatientDashboardProfile | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -97,6 +109,27 @@ export default function DashboardPage() {
     }
   }, [user?.id, isPatient]);
 
+  const loadPatientProfile = useCallback(async () => {
+    if (!user?.id || !isPatient) return;
+    try {
+      const res = await fetch(
+        `/api/patient-profile?patientId=${encodeURIComponent(user.id)}`
+      );
+      const data = await res.json();
+      if (data.success && data.profile) {
+        setPatientProfile(data.profile as PatientDashboardProfile);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [user?.id, isPatient]);
+
+  useEffect(() => {
+    if (user?.id && isPatient) {
+      loadPatientProfile();
+    }
+  }, [user?.id, isPatient, loadPatientProfile]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -108,7 +141,8 @@ export default function DashboardPage() {
     }
 
     fetchData();
-    const interval = setInterval(fetchData, 400);
+    // Poll every 100ms for real-time responsiveness (10 updates/sec)
+    const interval = setInterval(fetchData, 100);
     return () => clearInterval(interval);
   }, [fetchData, authLoading, user, router, isDoctor]);
 
@@ -275,6 +309,74 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {patientProfile && (
+          <div className="mb-6 glass-card flex flex-wrap gap-6 items-start">
+            <div className="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-700 shrink-0">
+              <UserRound className="w-6 h-6 text-slate-700 dark:text-slate-200" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-white mb-2">
+                Your profile
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <p>
+                  <span className="text-slate-400 dark:text-slate-500">Name</span>
+                  <br />
+                  <span className="font-medium text-slate-800 dark:text-white">{patientProfile.name}</span>
+                </p>
+                <p>
+                  <span className="text-slate-400 dark:text-slate-500">Email</span>
+                  <br />
+                  <span className="font-medium text-slate-800 dark:text-white break-all">
+                    {patientProfile.email}
+                  </span>
+                </p>
+                {patientProfile.age != null && (
+                  <p>
+                    <span className="text-slate-400 dark:text-slate-500">Age</span>
+                    <br />
+                    <span className="font-medium text-slate-800 dark:text-white">{patientProfile.age} yrs</span>
+                  </p>
+                )}
+                {patientProfile.gender && (
+                  <p>
+                    <span className="text-slate-400 dark:text-slate-500">Gender</span>
+                    <br />
+                    <span className="capitalize font-medium text-slate-800 dark:text-white">
+                      {patientProfile.gender}
+                    </span>
+                  </p>
+                )}
+                {patientProfile.heightM != null && (
+                  <p>
+                    <span className="text-slate-400 dark:text-slate-500">Height</span>
+                    <br />
+                    <span className="font-medium text-slate-800 dark:text-white">
+                      {patientProfile.heightM} m
+                    </span>
+                  </p>
+                )}
+                {patientProfile.weightKg != null && (
+                  <p>
+                    <span className="text-slate-400 dark:text-slate-500">Weight</span>
+                    <br />
+                    <span className="font-medium text-slate-800 dark:text-white">
+                      {patientProfile.weightKg} kg
+                    </span>
+                  </p>
+                )}
+                {patientProfile.bmi != null && (
+                  <p>
+                    <span className="text-slate-400 dark:text-slate-500">BMI</span>
+                    <br />
+                    <span className="font-medium text-slate-800 dark:text-white">{patientProfile.bmi}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Recording controls — only buffered server-side samples while recording */}
         <div className="mb-6 glass-card flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -323,8 +425,8 @@ export default function DashboardPage() {
               <Download className="w-4 h-4" /> Download last session CSV
             </button>
             <span className="text-xs text-slate-500">
-              CSV columns: patient name, age, gender, height (cm), weight (kg), then timestamp, emg_mv,
-              window AC RMS (mV), FFT peak magnitude.
+              CSV columns: patient name, age, gender, height (m), weight (kg), BMI, then timestamp,
+              emg_mv, window AC RMS (mV), FFT peak magnitude.
             </span>
           </div>
         )}

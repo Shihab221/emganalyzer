@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { users, patientProfiles } from '@/lib/store';
-import { AuthResponse, User, PatientProfile } from '@/lib/types';
+import { findUserByEmail, createUser } from '@/lib/db';
+import { AuthResponse } from '@/lib/types';
+import { computeBmiKgM2 } from '@/lib/patient-bmi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, role, age, gender, heightCm, weightKg } = await request.json();
+    const { email, password, name, role, age, gender, heightM, weightKg } = await request.json();
 
     if (!email || !password || !name || !role) {
       return NextResponse.json(
@@ -25,22 +26,22 @@ export async function POST(request: NextRequest) {
 
     if (role === 'patient') {
       const ageNum = Number(age);
-      const h = Number(heightCm);
+      const h = Number(heightM);
       const w = Number(weightKg);
 
       if (
         age === undefined ||
         age === '' ||
         !gender ||
-        heightCm === undefined ||
-        heightCm === '' ||
+        heightM === undefined ||
+        heightM === '' ||
         weightKg === undefined ||
         weightKg === ''
       ) {
         return NextResponse.json(
           {
             success: false,
-            message: 'Patients must provide age, gender, height (cm), and weight (kg)',
+            message: 'Patients must provide age, gender, height (m), and weight (kg)',
           } as AuthResponse,
           { status: 400 }
         );
@@ -60,9 +61,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (!Number.isFinite(h) || h < 50 || h > 250) {
+      if (!Number.isFinite(h) || h < 0.5 || h > 2.5) {
         return NextResponse.json(
-          { success: false, message: 'Height (cm) must be between 50 and 250' } as AuthResponse,
+          { success: false, message: 'Height (m) must be between 0.5 and 2.5' } as AuthResponse,
           { status: 400 }
         );
       }
@@ -73,45 +74,47 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      const bmi = computeBmiKgM2(w, h);
+      if (!Number.isFinite(bmi)) {
+        return NextResponse.json(
+          { success: false, message: 'Could not compute BMI from height and weight' } as AuthResponse,
+          { status: 400 }
+        );
+      }
     }
 
-    const emailLower = email.toLowerCase();
-    if (users.has(emailLower)) {
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
       return NextResponse.json(
         { success: false, message: 'Email already registered' } as AuthResponse,
         { status: 400 }
       );
     }
 
-    const userId = `${role}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const user: User & { password: string } = {
-      id: userId,
-      email: emailLower,
+    const user = await createUser({
+      email,
+      password,
       name,
       role,
-      password,
-      createdAt: Date.now(),
+      age: role === 'patient' ? Number(age) : undefined,
+      gender: role === 'patient' ? gender : undefined,
+      heightM: role === 'patient' ? Number(heightM) : undefined,
+      weightKg: role === 'patient' ? Number(weightKg) : undefined,
+    });
+
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as 'doctor' | 'patient',
+      createdAt: user.createdAt.getTime(),
     };
-
-    users.set(emailLower, user);
-
-    if (role === 'patient') {
-      const profile: PatientProfile = {
-        userId,
-        age: Number(age),
-        gender,
-        heightCm: Number(heightCm),
-        weightKg: Number(weightKg),
-      };
-      patientProfiles.set(userId, profile);
-    }
-
-    const { password: _, ...userWithoutPassword } = user;
 
     return NextResponse.json({
       success: true,
       message: 'Registration successful',
-      user: userWithoutPassword,
+      user: userResponse,
     } as AuthResponse);
   } catch (error) {
     console.error('Registration error:', error);

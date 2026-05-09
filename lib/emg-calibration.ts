@@ -2,12 +2,14 @@
 // EMG ADC → voltage (mV) for ESP32 12‑bit sampling
 //
 // Stored samples remain raw counts (`SensorData.emg`). All analysis / CSV /
-// charts convert using these helpers. Adjust full‑scale when your wiring /
-// attenuation differs (default = 3300 for ~3.3 V span).
+// charts convert using these helpers.
+//
+// For EMG signals, the typical range is 0-5 mV after amplification.
+// The ADC maps 0-4095 counts to 0-5 mV range.
 // ============================================
 
-/** Full-scale ADC span in millivolts (typical ESP32 analog ~3.3 V). */
-export const EMG_ADC_FULL_SCALE_MV = 3300;
+/** Full-scale EMG range in millivolts (typical EMG signal range after amplification). */
+export const EMG_ADC_FULL_SCALE_MV = 5;
 
 const ADC_MAX_COUNT = 4095;
 

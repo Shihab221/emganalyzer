@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { users } from '@/lib/store';
+import { findUserByEmail, seedDemoData } from '@/lib/db';
 import { AuthResponse } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -7,6 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    // Ensure demo data exists
+    await seedDemoData();
+
     const { email, password } = await request.json();
 
     if (!email || !password) {
@@ -16,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = users.get(email.toLowerCase());
+    const user = await findUserByEmail(email);
 
     if (!user || user.password !== password) {
       return NextResponse.json(
@@ -25,12 +28,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { password: _, ...userWithoutPassword } = user;
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as 'doctor' | 'patient',
+      createdAt: user.createdAt.getTime(),
+    };
 
     return NextResponse.json({
       success: true,
       message: 'Login successful',
-      user: userWithoutPassword,
+      user: userResponse,
     } as AuthResponse);
   } catch (error) {
     console.error('Login error:', error);

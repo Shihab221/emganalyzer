@@ -20,7 +20,7 @@ export default function LoginPage() {
   const [role, setRole] = useState<UserRole>('patient');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
-  const [heightCm, setHeightCm] = useState('');
+  const [heightM, setHeightM] = useState('');
   const [weightKg, setWeightKg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,8 +40,8 @@ export default function LoginPage() {
           role,
           age: age ? parseInt(age, 10) : undefined,
           gender: role === 'patient' ? gender : undefined,
-          heightCm:
-            role === 'patient' && heightCm !== '' ? parseFloat(heightCm) : undefined,
+          heightM:
+            role === 'patient' && heightM !== '' ? parseFloat(heightM) : undefined,
           weightKg:
             role === 'patient' && weightKg !== '' ? parseFloat(weightKg) : undefined,
         });
@@ -218,17 +218,17 @@ export default function LoginPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Height (cm)
+                        Height (meters)
                       </label>
                       <input
                         type="number"
-                        value={heightCm}
-                        onChange={(e) => setHeightCm(e.target.value)}
+                        value={heightM}
+                        onChange={(e) => setHeightM(e.target.value)}
                         className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                        placeholder="175"
-                        min="50"
-                        max="250"
-                        step="0.1"
+                        placeholder="1.75"
+                        min="0.5"
+                        max="2.5"
+                        step="0.01"
                         required={role === 'patient'}
                       />
                     </div>

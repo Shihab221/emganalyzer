@@ -57,8 +57,9 @@ export function initializeDemoData() {
     userId: patientId,
     age: 35,
     gender: 'male',
-    heightCm: 175,
+    heightM: 1.75,
     weightKg: 72,
+    bmi: 23.5,
     medicalNotes: 'Demo patient for testing',
   });
 }
@@ -125,8 +126,9 @@ export function startRecording(
     patientName,
     patientAge: profile?.age,
     patientGender: profile?.gender,
-    patientHeightCm: profile?.heightCm,
+    patientHeightM: profile?.heightM,
     patientWeightKg: profile?.weightKg,
+    patientBmi: profile?.bmi,
     startTime: Date.now(),
     data: [],
     isActive: true,

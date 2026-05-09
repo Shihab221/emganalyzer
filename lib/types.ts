@@ -25,10 +25,12 @@ export interface PatientProfile {
   userId: string;
   age: number;
   gender: 'male' | 'female' | 'other';
-  /** Body height in centimeters */
-  heightCm: number;
+  /** Body height in meters */
+  heightM: number;
   /** Body weight in kilograms */
   weightKg: number;
+  /** Body mass index (kg/m²), computed at registration from height and weight */
+  bmi: number;
   medicalNotes?: string;
 }
 
@@ -58,8 +60,9 @@ export interface EMGSession {
   patientName: string;
   patientAge?: number;
   patientGender?: string;
-  patientHeightCm?: number;
+  patientHeightM?: number;
   patientWeightKg?: number;
+  patientBmi?: number;
   startTime: number;
   endTime?: number;
   data: SensorData[];
@@ -115,7 +118,7 @@ export interface RegisterData extends LoginCredentials {
   role: UserRole;
   age?: number;
   gender?: 'male' | 'female' | 'other';
-  heightCm?: number;
+  heightM?: number;
   weightKg?: number;
 }
 

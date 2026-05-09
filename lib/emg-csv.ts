@@ -9,8 +9,9 @@ export interface EmgCsvPatientMeta {
   patientName: string;
   patientAge?: number;
   patientGender?: string;
-  patientHeightCm?: number;
+  patientHeightM?: number;
   patientWeightKg?: number;
+  patientBmi?: number;
 }
 
 function timestampOneField(ms: number): string {
@@ -74,20 +75,21 @@ function fftPeakMagnitudeMv(data: SensorData[], i: number, rateHz: number): numb
 export function buildEmgCsvWithAnalysis(data: SensorData[], meta?: EmgCsvPatientMeta): string {
   const rateHz = inferSampleRateHz(data);
   const header =
-    'patient_name,patient_age,patient_gender,patient_height_cm,patient_weight_kg,timestamp,emg_mv,rms_mv,fft_magnitude_mv\n';
+    'patient_name,patient_age,patient_gender,patient_height_m,patient_weight_kg,patient_bmi,timestamp,emg_mv,rms_mv,fft_magnitude_mv\n';
 
   const nameCell = meta ? metaCellString(meta.patientName) : '';
   const ageCell = meta ? metaCellNum(meta.patientAge) : '';
   const genderCell = meta ? metaCellString(meta.patientGender ?? '') : '';
-  const hCell = meta ? metaCellNum(meta.patientHeightCm) : '';
+  const hCell = meta ? metaCellNum(meta.patientHeightM) : '';
   const wCell = meta ? metaCellNum(meta.patientWeightKg) : '';
+  const bmiCell = meta ? metaCellNum(meta.patientBmi) : '';
 
   const lines = data.map((d, i) => {
     const ts = timestampOneField(d.timestamp);
     const emgMv = Math.round(rawEmgToMv(d.emg) * 1000) / 1000;
     const rmsMv = rollingAcRmsMv(data, i);
     const fftMagMv = fftPeakMagnitudeMv(data, i, rateHz);
-    return `${nameCell},${ageCell},${genderCell},${hCell},${wCell},${ts},${emgMv},${rmsMv},${fftMagMv}`;
+    return `${nameCell},${ageCell},${genderCell},${hCell},${wCell},${bmiCell},${ts},${emgMv},${rmsMv},${fftMagMv}`;
   });
 
   return header + lines.join('\n');

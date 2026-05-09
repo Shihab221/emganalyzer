@@ -1,15 +1,16 @@
 // ============================================
 // API Route: /api/sensor-data
+// High-throughput endpoint for ESP32 data
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { SensorData, ApiResponse } from '@/lib/types';
+import { ApiResponse } from '@/lib/types';
 import {
   addLiveSensorSample,
   appendToActiveRecording,
-  getSensorHistory,
-  getLatestData,
-} from '@/lib/store';
+  getLiveSensorHistory,
+  getLatestLiveSensorData,
+} from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,32 +19,28 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
 
-    if (typeof data.emg !== 'number') {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Invalid data format. Required: emg (number)',
-        } as ApiResponse,
-        { status: 400 }
-      );
+    // Support batch mode: array of samples or single sample
+    const samples = Array.isArray(data) ? data : [data];
+    
+    for (const sample of samples) {
+      if (typeof sample.emg !== 'number') {
+        continue; // Skip invalid samples
+      }
+
+      const emgValue = sample.emg;
+      
+      // Add to live display buffer and active recording (if any)
+      await Promise.all([
+        addLiveSensorSample(emgValue),
+        appendToActiveRecording(emgValue),
+      ]);
     }
 
-    // Always use server wall-clock time for storage and graphs (ESP millis wraps / drifts).
-    const serverNow = Date.now();
-    const sensorData: SensorData = {
-      emg: data.emg,
-      timestamp: serverNow,
-    };
-
-    addLiveSensorSample(sensorData);
-    appendToActiveRecording(sensorData);
-
-    console.log(`📊 Received: EMG=${data.emg} @ ${new Date(serverNow).toISOString()}`);
+    console.log(`📊 Received ${samples.length} sample(s), last EMG=${samples[samples.length - 1]?.emg}`);
 
     return NextResponse.json({
       success: true,
-      message: 'Data received successfully',
-      data: sensorData,
+      message: `Received ${samples.length} sample(s)`,
     } as ApiResponse);
   } catch (error) {
     console.error('Error processing sensor data:', error);
@@ -55,8 +52,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const latest = getLatestData();
-    const history = getSensorHistory();
+    const [latest, history] = await Promise.all([
+      getLatestLiveSensorData(),
+      getLiveSensorHistory(300), // Get last 300 samples for smooth display
+    ]);
 
     if (!latest) {
       return NextResponse.json({
@@ -70,7 +69,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       latest,
-      history: history.slice(-100),
+      history,
     } as ApiResponse);
   } catch (error) {
     console.error('Error fetching sensor data:', error);

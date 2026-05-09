@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   // 'doctor' or 'patient'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Patient profile (only for patients)
+  patientProfile PatientProfile?
+
+  // Doctor comments
+  comments DoctorComment[]
+
+  // Sessions (for patients)
+  sessions EMGSession[]
+
+  @@map("users")
+}
+
+model PatientProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  age          Int
+  gender       String   // 'male', 'female', 'other'
+  heightM      Float    // Height in meters
+  weightKg     Float    // Weight in kg
+  bmi          Float    // Computed BMI
+  medicalNotes String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("patient_profiles")
+}
+
+model EMGSession {
+  id              String    @id @default(cuid())
+  patientId       String
+  patientName     String
+  patientAge      Int?
+  patientGender   String?
+  patientHeightM  Float?
+  patientWeightKg Float?
+  patientBmi      Float?
+  startTime       DateTime  @default(now())
+  endTime         DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  patient  User            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  data     SensorData[]
+  comments DoctorComment[]
+
+  @@map("emg_sessions")
+}
+
+model SensorData {
+  id        String   @id @default(cuid())
+  sessionId String
+  emg       Int      // Raw ADC value (0-4095)
+  timestamp DateTime @default(now())
+
+  session EMGSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, timestamp])
+  @@map("sensor_data")
+}
+
+model DoctorComment {
+  id         String   @id @default(cuid())
+  sessionId  String
+  doctorId   String
+  doctorName String
+  content    String
+  timestamp  DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  session EMGSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  doctor  User       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@map("doctor_comments")
+}
+
+// Live sensor buffer - for real-time display (not tied to sessions)
+model LiveSensorBuffer {
+  id        String   @id @default(cuid())
+  emg       Int
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([timestamp])
+  @@map("live_sensor_buffer")
+}
+
+// Active recording state
+model ActiveRecording {
+  id        String   @id @default(cuid())
+  patientId String   @unique
+  sessionId String
+  startedAt DateTime @default(now())
+
+  @@map("active_recordings")
+}

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Header } from '@/components/Header';
-import { EMGSession } from '@/lib/types';
 import {
   ArrowRight,
   LogOut,
@@ -21,18 +20,25 @@ interface PatientRow {
   email: string;
   age?: number;
   gender?: string;
-  heightCm?: number;
+  heightM?: number;
   weightKg?: number;
+  bmi?: number;
   isRecording: boolean;
   activeSessionId: string | null;
   createdAt: number;
+}
+
+interface SessionListItem {
+  id: string;
+  patientId: string;
+  startTime: number;
 }
 
 export default function DoctorHomePage() {
   const router = useRouter();
   const { user, isLoading: authLoading, logout, isDoctor } = useAuth();
   const [patients, setPatients] = useState<PatientRow[]>([]);
-  const [sessions, setSessions] = useState<EMGSession[]>([]);
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
@@ -165,11 +171,14 @@ export default function DoctorHomePage() {
                         {p.gender && (
                           <span className="capitalize ml-2">{p.gender}</span>
                         )}
-                        {p.heightCm != null && (
-                          <span className="ml-2">{p.heightCm} cm</span>
+                        {p.heightM != null && (
+                          <span className="ml-2">{p.heightM} m</span>
                         )}
                         {p.weightKg != null && (
                           <span className="ml-2">{p.weightKg} kg</span>
+                        )}
+                        {p.bmi != null && (
+                          <span className="ml-2">BMI {p.bmi}</span>
                         )}
                       </p>
                     </div>
