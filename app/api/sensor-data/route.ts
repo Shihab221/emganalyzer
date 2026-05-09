@@ -9,7 +9,7 @@ import {
   pushLiveSample,
   getLiveHistory,
   getLatestLive,
-  enqueueRecordingSample,
+  enqueueBatchRecordingSamples,
 } from '@/lib/stream-ingest';
 import { getLatestLiveSensorData, getLiveSensorHistory } from '@/lib/db';
 
@@ -22,22 +22,32 @@ export async function POST(request: NextRequest) {
 
     // Support batch mode: array of samples or single sample
     const samples = Array.isArray(data) ? data : [data];
+    const serverNow = Date.now();
+
+    // Collect valid samples for live display and recording
+    const validSamples: { emg: number; timestampMs: number }[] = [];
 
     for (const sample of samples) {
       if (typeof sample.emg !== 'number') {
         continue;
       }
-
-      const serverNow = Date.now();
       const emgValue = sample.emg;
 
+      // Push to live ring buffer (synchronous, instant)
       pushLiveSample({ emg: emgValue, timestamp: serverNow });
-      await enqueueRecordingSample(emgValue, serverNow);
+
+      // Collect for batch recording
+      validSamples.push({ emg: emgValue, timestampMs: serverNow });
+    }
+
+    // Single batch enqueue for recording (efficient)
+    if (validSamples.length > 0) {
+      await enqueueBatchRecordingSamples(validSamples);
     }
 
     return NextResponse.json({
       success: true,
-      message: `Received ${samples.length} sample(s)`,
+      message: `Received ${validSamples.length} sample(s)`,
     } as ApiResponse);
   } catch (error) {
     console.error('Error processing sensor data:', error);

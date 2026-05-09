@@ -77,6 +77,9 @@ async function resolveRecordingSessionId(): Promise<string | null> {
   return null;
 }
 
+// Mutex to prevent concurrent flush operations
+let flushInProgress = false;
+
 /** Queue sample for persisted session; batched INSERT to reduce DB load. */
 export async function enqueueRecordingSample(emg: number, timestampMs: number): Promise<void> {
   const sessionId = await resolveRecordingSessionId();
@@ -85,7 +88,26 @@ export async function enqueueRecordingSample(emg: number, timestampMs: number): 
   const batch = recordBatch();
   batch.push({ sessionId, emg, timestamp: new Date(timestampMs) });
 
-  if (batch.length >= RECORD_BATCH_SIZE) {
+  // Only trigger flush if not already flushing and batch is full
+  if (batch.length >= RECORD_BATCH_SIZE && !flushInProgress) {
+    await flushRecordingBatch(false);
+  }
+}
+
+/** Enqueue multiple samples at once (more efficient for batched ESP32 data). */
+export async function enqueueBatchRecordingSamples(
+  samples: { emg: number; timestampMs: number }[]
+): Promise<void> {
+  const sessionId = await resolveRecordingSessionId();
+  if (!sessionId) return;
+
+  const batch = recordBatch();
+  for (const s of samples) {
+    batch.push({ sessionId, emg: s.emg, timestamp: new Date(s.timestampMs) });
+  }
+
+  // Flush if we have enough samples
+  if (batch.length >= RECORD_BATCH_SIZE && !flushInProgress) {
     await flushRecordingBatch(false);
   }
 }
@@ -95,11 +117,18 @@ export async function flushRecordingBatch(force: boolean): Promise<void> {
   const batch = recordBatch();
   if (batch.length === 0) return;
   if (!force && batch.length < RECORD_BATCH_SIZE) return;
+  if (flushInProgress && !force) return; // Skip if already flushing (unless forced)
 
-  const chunk = batch.splice(0, batch.length);
-  if (chunk.length === 0) return;
+  flushInProgress = true;
+  try {
+    const chunk = batch.splice(0, batch.length);
+    if (chunk.length === 0) return;
 
-  await prisma.sensorData.createMany({
-    data: chunk,
-  });
+    await prisma.sensorData.createMany({
+      data: chunk,
+      skipDuplicates: true, // Prevent errors from duplicate inserts
+    });
+  } finally {
+    flushInProgress = false;
+  }
 }

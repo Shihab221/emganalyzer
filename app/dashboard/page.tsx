@@ -141,8 +141,9 @@ export default function DashboardPage() {
     }
 
     fetchData();
-    // Poll every 100ms for real-time responsiveness (10 updates/sec)
-    const interval = setInterval(fetchData, 100);
+    // Poll every 200ms for real-time responsiveness (5 updates/sec)
+    // This matches well with ESP32 batching at 500ms intervals
+    const interval = setInterval(fetchData, 200);
     return () => clearInterval(interval);
   }, [fetchData, authLoading, user, router, isDoctor]);
 
