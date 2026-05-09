@@ -19,12 +19,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = getSessionById(sessionId)?.data;
+    const session = getSessionById(sessionId);
+    const data = session?.data;
     if (!data || data.length === 0) {
       return NextResponse.json({ success: false, message: 'Session not found or empty' }, { status: 404 });
     }
 
-    const csv = buildEmgCsvWithAnalysis(data);
+    const csv = buildEmgCsvWithAnalysis(data, {
+      patientName: session.patientName,
+      patientAge: session.patientAge,
+      patientGender: session.patientGender,
+      patientHeightCm: session.patientHeightCm,
+      patientWeightKg: session.patientWeightKg,
+    });
     const safeId = sessionId.replace(/[^\w.-]+/g, '_').slice(0, 120);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `emg_session_${safeId}_${stamp}.csv`;

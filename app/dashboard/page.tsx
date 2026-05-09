@@ -323,7 +323,8 @@ export default function DashboardPage() {
               <Download className="w-4 h-4" /> Download last session CSV
             </button>
             <span className="text-xs text-slate-500">
-              CSV columns: timestamp, instantaneous emg_mv, window AC RMS (mV), FFT peak magnitude (mV‑scaled bins).
+              CSV columns: patient name, age, gender, height (cm), weight (kg), then timestamp, emg_mv,
+              window AC RMS (mV), FFT peak magnitude.
             </span>
           </div>
         )}

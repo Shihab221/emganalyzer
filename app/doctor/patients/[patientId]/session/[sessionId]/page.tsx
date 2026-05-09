@@ -196,7 +196,7 @@ export default function DoctorSessionDetailPage() {
               onClick={downloadCsv}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700"
             >
-              <Download className="w-4 h-4" /> Download CSV (timestamp · mV columns)
+              <Download className="w-4 h-4" /> Download CSV (patient info + EMG columns)
             </button>
           )}
         </div>

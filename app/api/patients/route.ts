@@ -22,6 +22,8 @@ export async function GET() {
           email: u.email,
           age: profile?.age,
           gender: profile?.gender,
+          heightCm: profile?.heightCm,
+          weightKg: profile?.weightKg,
           isRecording,
           activeSessionId: isRecording ? activeSessions.get(u.id) : null,
           createdAt: u.createdAt,

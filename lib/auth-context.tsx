@@ -17,6 +17,8 @@ interface AuthContextType {
     role: UserRole;
     age?: number;
     gender?: 'male' | 'female' | 'other';
+    heightCm?: number;
+    weightKg?: number;
   }) => Promise<{ success: boolean; message?: string; user?: User }>;
   logout: () => void;
   isDoctor: boolean;
@@ -68,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: UserRole;
     age?: number;
     gender?: 'male' | 'female' | 'other';
+    heightCm?: number;
+    weightKg?: number;
   }) => {
     try {
       const response = await fetch('/api/auth/register', {

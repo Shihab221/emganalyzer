@@ -14,6 +14,8 @@ interface PatientRow {
   email: string;
   age?: number;
   gender?: string;
+  heightCm?: number;
+  weightKg?: number;
   isRecording: boolean;
 }
 
@@ -116,6 +118,8 @@ export default function DoctorPatientSessionsPage() {
             <p className="mt-1">
               {patient.age != null && <span>{patient.age} yrs</span>}
               {patient.gender && <span className="capitalize ml-3">{patient.gender}</span>}
+              {patient.heightCm != null && <span className="ml-3">{patient.heightCm} cm</span>}
+              {patient.weightKg != null && <span className="ml-3">{patient.weightKg} kg</span>}
               {patient.isRecording && (
                 <span className="ml-3 text-green-600 dark:text-green-400 font-medium">
                   Currently recording

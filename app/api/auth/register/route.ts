@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, role, age, gender } = await request.json();
+    const { email, password, name, role, age, gender, heightCm, weightKg } = await request.json();
 
     if (!email || !password || !name || !role) {
       return NextResponse.json(
@@ -21,6 +21,58 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'Invalid role' } as AuthResponse,
         { status: 400 }
       );
+    }
+
+    if (role === 'patient') {
+      const ageNum = Number(age);
+      const h = Number(heightCm);
+      const w = Number(weightKg);
+
+      if (
+        age === undefined ||
+        age === '' ||
+        !gender ||
+        heightCm === undefined ||
+        heightCm === '' ||
+        weightKg === undefined ||
+        weightKg === ''
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Patients must provide age, gender, height (cm), and weight (kg)',
+          } as AuthResponse,
+          { status: 400 }
+        );
+      }
+
+      if (!['male', 'female', 'other'].includes(gender)) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid gender' } as AuthResponse,
+          { status: 400 }
+        );
+      }
+
+      if (!Number.isFinite(ageNum) || ageNum < 1 || ageNum > 120) {
+        return NextResponse.json(
+          { success: false, message: 'Age must be between 1 and 120' } as AuthResponse,
+          { status: 400 }
+        );
+      }
+
+      if (!Number.isFinite(h) || h < 50 || h > 250) {
+        return NextResponse.json(
+          { success: false, message: 'Height (cm) must be between 50 and 250' } as AuthResponse,
+          { status: 400 }
+        );
+      }
+
+      if (!Number.isFinite(w) || w < 15 || w > 400) {
+        return NextResponse.json(
+          { success: false, message: 'Weight (kg) must be between 15 and 400' } as AuthResponse,
+          { status: 400 }
+        );
+      }
     }
 
     const emailLower = email.toLowerCase();
@@ -43,11 +95,13 @@ export async function POST(request: NextRequest) {
 
     users.set(emailLower, user);
 
-    if (role === 'patient' && age && gender) {
+    if (role === 'patient') {
       const profile: PatientProfile = {
         userId,
         age: Number(age),
         gender,
+        heightCm: Number(heightCm),
+        weightKg: Number(weightKg),
       };
       patientProfiles.set(userId, profile);
     }

@@ -21,6 +21,8 @@ interface PatientRow {
   email: string;
   age?: number;
   gender?: string;
+  heightCm?: number;
+  weightKg?: number;
   isRecording: boolean;
   activeSessionId: string | null;
   createdAt: number;
@@ -162,6 +164,12 @@ export default function DoctorHomePage() {
                         {p.age != null && <span>{p.age} yrs</span>}
                         {p.gender && (
                           <span className="capitalize ml-2">{p.gender}</span>
+                        )}
+                        {p.heightCm != null && (
+                          <span className="ml-2">{p.heightCm} cm</span>
+                        )}
+                        {p.weightKg != null && (
+                          <span className="ml-2">{p.weightKg} kg</span>
                         )}
                       </p>
                     </div>
