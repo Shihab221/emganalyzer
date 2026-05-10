@@ -1,22 +1,15 @@
 // ============================================
-// POST /api/fatigue-analysis — run fatigue_model.pkl on a session (doctors only)
+// POST /api/fatigue-analysis — run fatigue_model.onnx on a session (doctors only, Node ONNX Runtime)
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { execFileSync } from 'child_process';
-import path from 'path';
 
-import { getSessionById } from '@/lib/db';
-import { computeFatigueFeatures } from '@/lib/fatigue-features';
+import { getSessionById } from '@/lib/db';import { computeFatigueFeatures } from '@/lib/fatigue-features';
+import { runFatigueOnnx } from '@/lib/fatigue-inference';
 import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function pythonExecutable(): string {
-  if (process.env.PYTHON_PATH) return process.env.PYTHON_PATH;
-  return process.platform === 'win32' ? 'python' : 'python3';
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,52 +45,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const scriptPath = path.join(process.cwd(), 'model', 'predict_fatigue.py');
-    const payload = JSON.stringify({
-      features: [features.rmsMv, features.dominantFreqHz, features.stdMv],
-    });
-
-    let stdout: string;
+    let onnx: Awaited<ReturnType<typeof runFatigueOnnx>>;
     try {
-      stdout = execFileSync(pythonExecutable(), [scriptPath], {
-        input: payload,
-        encoding: 'utf-8',
-        maxBuffer: 4 * 1024 * 1024,
-        windowsHide: true,
-      });
+      onnx = await runFatigueOnnx([
+        features.rmsMv,
+        features.dominantFreqHz,
+        features.stdMv,
+      ]);
     } catch (e) {
-      const err = e as { stderr?: string; message?: string };
-      console.error('fatigue-analysis python error:', err.stderr ?? err.message);
+      console.error('fatigue-analysis ONNX error:', e);
       return NextResponse.json(
         {
           success: false,
           message:
-            'Could not run the fatigue model. Install Python 3 and dependencies: pip install -r model/requirements.txt',
+            'Could not run the fatigue model. Ensure model/fatigue_model.onnx exists (run python model/export_onnx.py if you only have the .pkl).',
         },
         { status: 503 }
-      );
-    }
-
-    let parsed: {
-      ok?: boolean;
-      prediction?: number;
-      classes?: number[];
-      probabilities?: Record<string, number>;
-      error?: string;
-    };
-    try {
-      parsed = JSON.parse(stdout.trim());
-    } catch {
-      return NextResponse.json(
-        { success: false, message: 'Invalid output from fatigue model script' },
-        { status: 500 }
-      );
-    }
-
-    if (!parsed.ok) {
-      return NextResponse.json(
-        { success: false, message: parsed.error ?? 'Model inference failed' },
-        { status: 500 }
       );
     }
 
@@ -110,9 +73,9 @@ export async function POST(request: NextRequest) {
         dominantFreqHz: Math.round(features.dominantFreqHz * 1000) / 1000,
         stdMv: Math.round(features.stdMv * 1000) / 1000,
       },
-      prediction: parsed.prediction,
-      classes: parsed.classes,
-      probabilities: parsed.probabilities,
+      prediction: onnx.prediction,
+      classes: onnx.classes,
+      probabilities: onnx.probabilities,
     });
   } catch (error) {
     console.error('fatigue-analysis route error:', error);

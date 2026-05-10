@@ -1,3 +1,10 @@
-# Inference for fatigue_model.pkl (RandomForest, sklearn-joblib)
+# Dev / one-time only: export fatigue_model.pkl -> fatigue_model.onnx
+#   pip install -r model/requirements.txt
+#   python model/export_onnx.py
+# Runtime uses onnxruntime-node in Next.js (no Python on the server).
+
 numpy>=1.23
 scikit-learn>=1.6,<1.8
+skl2onnx>=1.16
+onnx>=1.14
+onnxruntime>=1.16

@@ -1,7 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable React strict mode for better development experience
   reactStrictMode: true,
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push('onnxruntime-node');
+    }
+    return config;
+  },
 }
 
 module.exports = nextConfig
