@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Activity, Loader2, Sparkles, X } from 'lucide-react';
+import { Activity, Loader2, Sparkles } from 'lucide-react';
 
 export interface FatigueAnalysisResult {
   success: boolean;
@@ -14,7 +14,7 @@ export interface FatigueAnalysisResult {
 interface FatigueAnalysisButtonProps {
   sessionId: string;
   doctorId: string;
-  /** Full button + panel on session detail; compact opens a modal on the sessions list */
+  /** Session detail toolbar; panel uses full-width row beneath actions */
   variant?: 'detail' | 'list';
 }
 
@@ -39,16 +39,29 @@ function outcomeDescription(pred: number): { title: string; hint: string } {
   };
 }
 
+/** Shared scroll-safe panel (below the triggering button in document flow). */
+function AnalysisSurface({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`relative z-10 w-full rounded-xl border border-violet-500/25 bg-white/95 dark:bg-slate-900/95 dark:border-violet-500/35 shadow-sm px-4 py-4 ${className ?? ''}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function FatigueAnalysisButton({ sessionId, doctorId, variant = 'detail' }: FatigueAnalysisButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FatigueAnalysisResult | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
 
   const run = async () => {
-    if (variant === 'list') {
-      setModalOpen(true);
-    }
     setLoading(true);
     setError(null);
     setResult(null);
@@ -71,145 +84,109 @@ export function FatigueAnalysisButton({ sessionId, doctorId, variant = 'detail' 
     }
   };
 
-  const panel = (insideModal?: boolean) => {
-    const body =
-      error || (result?.success && result.prediction != null && result.features) ? (
-        <>
-          {error && (
-            <p className={`text-sm text-red-600 dark:text-red-400 ${insideModal ? '' : 'p-4 pb-0'}`}>{error}</p>
-          )}
-          {result?.success && result.prediction != null && result.features && (
-            <div className={insideModal ? '' : 'p-4 space-y-4'}>
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-violet-500/20">
-                  <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900 dark:text-white">Fatigue analysis</h3>
-                  <p className="text-sm font-medium text-violet-700 dark:text-violet-300 mt-1">
-                    {outcomeDescription(result.prediction).title}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">{outcomeDescription(result.prediction).hint}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
-                    {formatProbabilities(result.probabilities)}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
-                  <p className="text-slate-500 text-xs">AC RMS (mV)</p>
-                  <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{result.features.rmsMv}</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
-                  <p className="text-slate-500 text-xs">Dominant frequency (Hz)</p>
-                  <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                    {result.features.dominantFreqHz}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
-                  <p className="text-slate-500 text-xs">σ instantaneous (mV)</p>
-                  <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{result.features.stdMv}</p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">
-                Features match model input order: RMS → dominant FFT bin frequency → std dev of waveform (mV).
-              </p>
-            </div>
-          )}
-        </>
-      ) : null;
+  const resultBody =
+    result?.success && result.prediction != null && result.features ? (
+      <>
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-violet-500/20 shrink-0">
+            <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-900 dark:text-white">Fatigue analysis</h3>
+            <p className="text-sm font-medium text-violet-700 dark:text-violet-300 mt-1 break-words">
+              {outcomeDescription(result.prediction).title}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">{outcomeDescription(result.prediction).hint}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+              {formatProbabilities(result.probabilities)}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm mt-4">
+          <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
+            <p className="text-slate-500 text-xs">AC RMS (mV)</p>
+            <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{result.features.rmsMv}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
+            <p className="text-slate-500 text-xs">Dominant frequency (Hz)</p>
+            <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+              {result.features.dominantFreqHz}
+            </p>
+          </div>
+          <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
+            <p className="text-slate-500 text-xs">σ instantaneous (mV)</p>
+            <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{result.features.stdMv}</p>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mt-3 leading-relaxed">
+          Features match model input order: RMS → dominant FFT bin frequency → std dev of waveform (mV).
+        </p>
+      </>
+    ) : null;
 
-    if (!insideModal && !body) return null;
+  const idleButtonClass =
+    variant === 'list'
+      ? 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60 shrink-0 self-center mr-3 my-2'
+      : 'order-1 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm hover:bg-violet-700 disabled:opacity-60 shrink-0';
 
-    return (
-      <div
-        className={
-          insideModal
-            ? 'space-y-4'
-            : 'glass-card border border-violet-500/20 bg-violet-500/5 mt-4'
-        }
-      >
-        {body}
-      </div>
-    );
-  };
+  const panelWrapperClass =
+    variant === 'list'
+      ? 'w-full basis-full border-t border-slate-200/80 dark:border-slate-700/80 px-4 py-4 bg-slate-50/50 dark:bg-slate-950/30'
+      : 'order-3 w-full basis-full mt-0';
 
   if (variant === 'list') {
     return (
       <>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            void run();
-          }}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60"
-        >
+        <button type="button" onClick={() => void run()} disabled={loading} className={idleButtonClass}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
           Analysis
         </button>
-
-        {modalOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => {
-              setModalOpen(false);
-              setError(null);
-              setResult(null);
-            }}
-          >
-            <div
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Session analysis</h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalOpen(false);
-                    setError(null);
-                    setResult(null);
-                  }}
-                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                  aria-label="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+        {loading && (
+          <div className={panelWrapperClass}>
+            <AnalysisSurface>
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm">
+                <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+                Running model…
               </div>
-              <div className="p-4">
-                {loading && (
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                    <Loader2 className="w-5 h-5 animate-spin" /> Running model…
-                  </div>
-                )}
-                {!loading && panel(true)}
-              </div>
-            </div>
+            </AnalysisSurface>
           </div>
         )}
+        {!loading && error && (
+          <div className={panelWrapperClass}>
+            <AnalysisSurface>
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </AnalysisSurface>
+          </div>
+        )}
+        {!loading && resultBody && <div className={panelWrapperClass}><AnalysisSurface>{resultBody}</AnalysisSurface></div>}
       </>
     );
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap gap-3 justify-end items-center">
-        <button
-          type="button"
-          onClick={() => void run()}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm hover:bg-violet-700 disabled:opacity-60"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-          Analysis
-        </button>
-      </div>
-      {!loading && panel()}
-    </div>
+    <>
+      <button type="button" onClick={() => void run()} disabled={loading} className={idleButtonClass}>
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+        Analysis
+      </button>
+      {loading && (
+        <div className={panelWrapperClass}>
+          <AnalysisSurface>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm">
+              <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+              Running model…
+            </div>
+          </AnalysisSurface>
+        </div>
+      )}
+      {!loading && error && (
+        <div className={panelWrapperClass}>
+          <AnalysisSurface>
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </AnalysisSurface>
+        </div>
+      )}
+      {!loading && resultBody && <div className={panelWrapperClass}><AnalysisSurface>{resultBody}</AnalysisSurface></div>}
+    </>
   );
 }
