@@ -1,0 +1,3 @@
+# Inference for fatigue_model.pkl (RandomForest, sklearn-joblib)
+numpy>=1.23
+scikit-learn>=1.6,<1.8

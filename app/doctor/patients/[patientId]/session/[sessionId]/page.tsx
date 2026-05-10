@@ -12,6 +12,7 @@ import { DISPLAY_SAMPLE_RATE_HZ } from '@/lib/constants';
 import { rawEmgToMv } from '@/lib/emg-calibration';
 import type { ChartDataPoint, EMGSession } from '@/lib/types';
 import { SensorCard } from '@/components/SensorCard';
+import { FatigueAnalysisButton } from '@/components/FatigueAnalysisButton';
 import { Activity, ArrowLeft, Clock, Download } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -189,15 +190,18 @@ export default function DoctorSessionDetailPage() {
           isConnected={session.isActive}
         />
 
-        <div className="flex flex-wrap gap-3 justify-end">
+        <div className="flex flex-wrap gap-3 justify-end items-start">
           {session.data.length > 0 && (
-            <button
-              type="button"
-              onClick={downloadCsv}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700"
-            >
-              <Download className="w-4 h-4" /> Download CSV (patient info + EMG columns)
-            </button>
+            <>
+              <FatigueAnalysisButton sessionId={session.id} doctorId={user.id} variant="detail" />
+              <button
+                type="button"
+                onClick={downloadCsv}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700"
+              >
+                <Download className="w-4 h-4" /> Download CSV (patient info + EMG columns)
+              </button>
+            </>
           )}
         </div>
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Header } from '@/components/Header';
 import { useEffect, useState, useCallback } from 'react';
+import { FatigueAnalysisButton } from '@/components/FatigueAnalysisButton';
 import { ArrowLeft, History, ChevronRight } from 'lucide-react';
 
 interface SessionListItem {
@@ -151,29 +152,34 @@ export default function DoctorPatientSessionsPage() {
           <ul className="space-y-2">
             {sessions.map((s) => (
               <li key={s.id}>
-                <Link
-                  href={`/doctor/patients/${patientId}/session/${s.id}`}
-                  className="glass-card flex flex-wrap items-center justify-between gap-3 hover:border-red-500/30"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-900 dark:text-white">
-                        {formatRange(s)}
-                      </span>
-                      {s.isActive && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-600 dark:text-green-400">
-                          Active
+                <div className="glass-card flex flex-wrap items-center gap-3 p-0 overflow-hidden">
+                  <Link
+                    href={`/doctor/patients/${patientId}/session/${s.id}`}
+                    className="flex flex-wrap flex-1 min-w-0 items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {formatRange(s)}
                         </span>
-                      )}
+                        {s.isActive && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-600 dark:text-green-400">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {s.dataCount ?? s.data?.length ?? 0} samples • {durationSec(s)} s
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {s.dataCount ?? s.data?.length ?? 0} samples • {durationSec(s)} s
-                    </p>
+                    <span className="inline-flex items-center gap-1 text-sm text-red-500 font-medium">
+                      View <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </Link>
+                  <div className="pr-3 py-2 shrink-0">
+                    <FatigueAnalysisButton sessionId={s.id} doctorId={user.id} variant="list" />
                   </div>
-                  <span className="inline-flex items-center gap-1 text-sm text-red-500 font-medium">
-                    View <ChevronRight className="w-4 h-4" />
-                  </span>
-                </Link>
+                </div>
               </li>
             ))}
           </ul>

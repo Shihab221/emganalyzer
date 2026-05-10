@@ -4,8 +4,8 @@
  * ============================================
  *
  * Receives EMG values from Arduino via Serial2 (UART2).
- * BATCHES multiple readings and sends them in one HTTP request
- * to prevent server overload.
+ * BATCHES all readings and sends them in ONE HTTP request
+ * to prevent server overload and ensure all data reaches website.
  *
  * Hardware Wiring:
  * Arduino TX (D1) -> Voltage Divider (5V->3.3V) -> ESP32 GPIO16 (RX2)
@@ -32,9 +32,12 @@ const char* WIFI_PASSWORD = "25388206";
 
 const char* SERVER_URL = "https://emganalyzer.vercel.app/api/sensor-data";
 
-// BATCHING CONFIG - Key to preventing server overload
-const int SEND_INTERVAL_MS = 500;   // Send batch every 500ms (2 requests/sec)
-const int MAX_BATCH_SIZE   = 50;    // Max samples per batch
+const int SEND_INTERVAL_MS = 500;  // Send batch every 500ms
+const int MAX_BATCH_SIZE   = 100;  // Max samples per batch
+
+// If your Arduino sends mV values (like 2.666), multiply to scale up
+// Set to 1000 to convert mV to microvolts, or 1 to keep as-is
+const float EMG_SCALE_FACTOR = 1000.0;  // mV -> µV (gives values like 2666)
 
 // Serial2 Pins
 const int ESP_RX2 = 16;
@@ -91,7 +94,7 @@ void connectToWiFi() {
 
 // ============================================
 // Read Arduino Serial Data
-// Parses lines like "512.00\n" into float values
+// Parses lines like "2.666\n" into float values
 // Adds each reading to the batch buffer
 // ============================================
 void readArduinoSerial() {
@@ -102,13 +105,21 @@ void readArduinoSerial() {
       if (lineBuffer.length() > 0) {
         float v = lineBuffer.toFloat();
         
-        // Add to batch buffer (if not full)
+        // Scale and add to batch buffer (if not full)
         if (batchCount < MAX_BATCH_SIZE) {
-          batchBuffer[batchCount].emg = (int)v;
+          // Scale the value (mV -> larger unit for visibility on chart)
+          int scaledValue = (int)(v * EMG_SCALE_FACTOR);
+          batchBuffer[batchCount].emg = scaledValue;
           batchBuffer[batchCount].timestamp = millis();
           batchCount++;
+          
+          Serial.print("Buffered [");
+          Serial.print(batchCount);
+          Serial.print("]: ");
+          Serial.print(v, 3);
+          Serial.print(" mV -> ");
+          Serial.println(scaledValue);
         }
-        // If buffer is full, oldest samples are lost (acceptable trade-off)
 
         lineBuffer = "";
       }
@@ -124,8 +135,8 @@ void readArduinoSerial() {
 
 // ============================================
 // Send Batched EMG Data to Server
-// Sends array: [{"emg": v1, "timestamp": t1}, {"emg": v2, "timestamp": t2}, ...]
-// Server already supports batch mode!
+// Sends JSON array: [{"emg": v1, "timestamp": t1}, {"emg": v2, "timestamp": t2}, ...]
+// Server supports batch mode!
 // ============================================
 void sendBatchedEMGData() {
   if (batchCount == 0) {
@@ -145,11 +156,10 @@ void sendBatchedEMGData() {
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
-  http.setTimeout(10000);  // 10 second timeout
+  http.setTimeout(15000);  // 15 second timeout for larger batches
 
-  // Build JSON array of samples
-  // Size: ~50 bytes per sample * MAX_BATCH_SIZE + overhead
-  DynamicJsonDocument doc(MAX_BATCH_SIZE * 64 + 256);
+  // Build JSON array of all buffered samples
+  DynamicJsonDocument doc(MAX_BATCH_SIZE * 64 + 512);
   JsonArray arr = doc.to<JsonArray>();
 
   int samplesToSend = batchCount;
@@ -159,17 +169,28 @@ void sendBatchedEMGData() {
     sample["timestamp"] = batchBuffer[i].timestamp;
   }
 
-  // Clear batch after copying to JSON
+  // Clear batch AFTER copying to JSON
   batchCount = 0;
 
   String jsonString;
   serializeJson(doc, jsonString);
 
-  Serial.print("Sending batch of ");
-  Serial.print(samplesToSend);
-  Serial.print(" samples (");
+  Serial.println("========== SENDING BATCH ==========");
+  Serial.print("Samples: ");
+  Serial.println(samplesToSend);
+  Serial.print("Payload size: ");
   Serial.print(jsonString.length());
-  Serial.println(" bytes)");
+  Serial.println(" bytes");
+  
+  // Print first few samples for debugging
+  if (samplesToSend > 0) {
+    Serial.print("First EMG: ");
+    Serial.println(arr[0]["emg"].as<int>());
+    if (samplesToSend > 1) {
+      Serial.print("Last EMG: ");
+      Serial.println(arr[samplesToSend-1]["emg"].as<int>());
+    }
+  }
 
   int httpResponseCode = http.POST(jsonString);
 
@@ -180,19 +201,19 @@ void sendBatchedEMGData() {
     Serial.print("): ");
     Serial.println(response);
 
-    // Blink LED once on success
+    // Quick blink on success
     digitalWrite(LED_PIN, LOW);
     delay(30);
     digitalWrite(LED_PIN, HIGH);
 
   } else {
-    Serial.print("Error sending batch! Code: ");
+    Serial.print("ERROR sending batch! Code: ");
     Serial.print(httpResponseCode);
     Serial.print(" (");
     Serial.print(HTTPClient::errorToString(httpResponseCode));
     Serial.println(")");
 
-    // Blink LED twice on failure
+    // Double blink on failure
     digitalWrite(LED_PIN, LOW);  delay(100);
     digitalWrite(LED_PIN, HIGH); delay(100);
     digitalWrite(LED_PIN, LOW);  delay(100);
@@ -200,6 +221,7 @@ void sendBatchedEMGData() {
   }
 
   http.end();
+  Serial.println("====================================");
 }
 
 // ============================================
@@ -214,7 +236,7 @@ void setup() {
   Serial.println();
   Serial.println("========================================");
   Serial.println("  EMG Analyzer - Arduino Serial Bridge ");
-  Serial.println("        (BATCHED MODE - Low Load)      ");
+  Serial.println("       ** BATCHED MODE ENABLED **      ");
   Serial.println("========================================");
   Serial.println();
   Serial.println("MODE: Real EMG via Arduino Serial (BATCHED)");
@@ -226,6 +248,8 @@ void setup() {
   Serial.print("Max batch size: ");
   Serial.print(MAX_BATCH_SIZE);
   Serial.println(" samples");
+  Serial.print("Scale factor: ");
+  Serial.println(EMG_SCALE_FACTOR);
   Serial.println();
 
   pinMode(LED_PIN, OUTPUT);
@@ -233,8 +257,9 @@ void setup() {
 
   connectToWiFi();
 
+  Serial.println();
   Serial.println("ESP32 ready. Waiting for Arduino EMG data...");
-  Serial.println("Samples will be batched and sent every " + String(SEND_INTERVAL_MS) + "ms");
+  Serial.println("All samples will be BATCHED and sent together!");
   Serial.println();
 }
 
@@ -242,25 +267,56 @@ void setup() {
 // MAIN LOOP
 // ============================================
 void loop() {
-  // Always read incoming Arduino serial data into batch buffer
+  // Continuously read incoming Arduino serial data into batch buffer
   readArduinoSerial();
 
   unsigned long currentTime = millis();
   
-  // Send batch at regular intervals (not per-sample!)
+  // Send batch at regular intervals
   if (currentTime - lastSendTime >= SEND_INTERVAL_MS) {
     lastSendTime = currentTime;
 
     if (batchCount > 0) {
-      Serial.print("Batch ready: ");
+      Serial.print("\n>>> Batch ready with ");
       Serial.print(batchCount);
       Serial.println(" samples");
       sendBatchedEMGData();
     } else {
-      Serial.println("No new EMG data received yet...");
+      Serial.println("Waiting for Arduino data...");
     }
   }
   
-  // Small yield to prevent watchdog issues
+  // Small yield to prevent watchdog timeout
   yield();
 }
+
+/*
+ * ============================================
+ * TROUBLESHOOTING TIPS
+ * ============================================
+ *
+ * 1. "WiFi not connecting"
+ *    - Double-check SSID and password (case-sensitive!)
+ *    - ESP32 only supports 2.4GHz WiFi (not 5GHz)
+ *
+ * 2. "Waiting for Arduino data..."
+ *    - Check TX/RX wiring between Arduino and ESP32
+ *    - Make sure Arduino is sending at 115200 baud
+ *    - Ensure voltage divider is correctly wired (5V->3.3V)
+ *    - Verify Arduino is printing values followed by \n
+ *
+ * 3. "ERROR sending batch"
+ *    - Check SERVER_URL is correct
+ *    - Server might be temporarily overloaded - will retry next interval
+ *    - If testing locally, use your PC's local IP (not localhost)
+ *
+ * 4. "Values too small on chart"
+ *    - Adjust EMG_SCALE_FACTOR at the top
+ *    - If Arduino sends mV (like 2.666), use 1000 to get µV (2666)
+ *    - If Arduino sends raw ADC (0-4095), use 1.0
+ *
+ * 5. "Data not showing on website"
+ *    - Check Response shows "Received X sample(s)" where X > 1
+ *    - If X is always 1, batching isn't working - check this code
+ *    - Refresh the website dashboard page
+ */
