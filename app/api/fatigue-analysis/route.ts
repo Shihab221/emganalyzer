@@ -1,10 +1,11 @@
 // ============================================
-// POST /api/fatigue-analysis — run fatigue_model.onnx on a session (doctors only, Node ONNX Runtime)
+// POST /api/fatigue-analysis — fatigue_rf.json (pure JS RF, Vercel-friendly)
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getSessionById } from '@/lib/db';import { computeFatigueFeatures } from '@/lib/fatigue-features';
+import { getSessionById } from '@/lib/db';
+import { computeFatigueFeatures } from '@/lib/fatigue-features';
 import { runFatigueOnnx } from '@/lib/fatigue-inference';
 import prisma from '@/lib/prisma';
 
@@ -45,20 +46,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let onnx: Awaited<ReturnType<typeof runFatigueOnnx>>;
+    let out: Awaited<ReturnType<typeof runFatigueOnnx>>;
     try {
-      onnx = await runFatigueOnnx([
+      out = await runFatigueOnnx([
         features.rmsMv,
         features.dominantFreqHz,
         features.stdMv,
       ]);
     } catch (e) {
-      console.error('fatigue-analysis ONNX error:', e);
+      console.error('fatigue-analysis model error:', e);
       return NextResponse.json(
         {
           success: false,
           message:
-            'Could not run the fatigue model. Ensure model/fatigue_model.onnx exists (run python model/export_onnx.py if you only have the .pkl).',
+            'Could not run the fatigue model. Ensure model/fatigue_rf.json exists (run: python model/export_rf_json.py after updating the .pkl).',
         },
         { status: 503 }
       );
@@ -73,9 +74,9 @@ export async function POST(request: NextRequest) {
         dominantFreqHz: Math.round(features.dominantFreqHz * 1000) / 1000,
         stdMv: Math.round(features.stdMv * 1000) / 1000,
       },
-      prediction: onnx.prediction,
-      classes: onnx.classes,
-      probabilities: onnx.probabilities,
+      prediction: out.prediction,
+      classes: out.classes,
+      probabilities: out.probabilities,
     });
   } catch (error) {
     console.error('fatigue-analysis route error:', error);

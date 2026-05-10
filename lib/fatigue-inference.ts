@@ -1,25 +1,29 @@
 // ============================================
-// ONNX inference (onnxruntime-node) for fatigue_model.onnx
-// No Python at runtime — regenerate ONNX with model/export_onnx.py after .pkl changes
+// Pure JS RandomForest inference — model/fatigue_rf.json
+// Regenerate JSON after .pkl changes: python model/export_rf_json.py
+// Keeps serverless bundles small (no onnxruntime-node).
 // ============================================
 
+import fs from 'fs';
 import path from 'path';
 
-import type { InferenceSession } from 'onnxruntime-node';
+/** sklearn stores left child -1 at leaves */
+const TREE_LEAF = -1;
 
-let sessionPromise: Promise<InferenceSession> | null = null;
-
-async function loadOrt() {
-  return import('onnxruntime-node');
+interface ExportedTree {
+  children_left: number[];
+  children_right: number[];
+  feature: number[];
+  threshold: number[];
+  /** For each node, class impulse / counts at node (leaf uses these for probabilities). */
+  values: number[][];
 }
 
-export async function getFatigueInferenceSession(): Promise<InferenceSession> {
-  if (!sessionPromise) {
-    const ort = await loadOrt();
-    const modelPath = path.join(process.cwd(), 'model', 'fatigue_model.onnx');
-    sessionPromise = ort.InferenceSession.create(modelPath);
-  }
-  return sessionPromise;
+interface ExportedForest {
+  version: number;
+  n_features: number;
+  classes: number[];
+  trees: ExportedTree[];
 }
 
 export interface FatigueOnnxResult {
@@ -28,46 +32,75 @@ export interface FatigueOnnxResult {
   probabilities: Record<string, number>;
 }
 
-/**
- * Runs RandomForest ONNX with input shape [1, 3].
- */
-export async function runFatigueOnnx(features: [number, number, number]): Promise<FatigueOnnxResult> {
-  const ort = await loadOrt();
-  const session = await getFatigueInferenceSession();
+let cachedForest: ExportedForest | null = null;
 
-  const input = new Float32Array([
-    features[0],
-    features[1],
-    features[2],
-  ]);
-  const tensor = new ort.Tensor('float32', input, [1, 3]);
+function loadForest(): ExportedForest {
+  if (cachedForest) return cachedForest;
+  const jsonPath = path.join(process.cwd(), 'model', 'fatigue_rf.json');
+  const raw = fs.readFileSync(jsonPath, 'utf-8');
+  cachedForest = JSON.parse(raw) as ExportedForest;
+  return cachedForest;
+}
 
-  const out = await session.run({ float_input: tensor });
-
-  const labelData = out.label?.data;
-  let prediction = 0;
-  if (labelData) {
-    const v = labelData[0];
-    prediction = typeof v === 'bigint' ? Number(v) : Number(v);
+function treePredictProba(tree: ExportedTree, x: [number, number, number]): number[] {
+  let node = 0;
+  while (tree.children_left[node] !== TREE_LEAF) {
+    const f = tree.feature[node];
+    if (f < 0 || f >= x.length) {
+      break;
+    }
+    if (x[f] <= tree.threshold[node]) {
+      node = tree.children_left[node];
+    } else {
+      node = tree.children_right[node];
+    }
   }
 
-  const probTensor = out.probabilities;
-  const probs = probTensor?.data;
-  if (!probs || probs.length === 0) {
-    return {
-      prediction,
-      classes: [0, 1],
-      probabilities: { '0': prediction === 0 ? 1 : 0, '1': prediction === 1 ? 1 : 0 },
-    };
+  const vals = tree.values[node];
+  let s = 0;
+  for (const v of vals) s += Math.max(0, v);
+  if (s <= 0) return vals.map(() => 1 / vals.length);
+  return vals.map((v) => Math.max(0, v) / s);
+}
+
+export function runFatigueModel(features: [number, number, number]): FatigueOnnxResult {
+  const forest = loadForest();
+  if (forest.version !== 1) {
+    throw new Error('Unsupported fatigue_rf.json version');
+  }
+  const nClasses = forest.classes.length;
+  const sum = new Array(nClasses).fill(0);
+
+  for (const tree of forest.trees) {
+    const p = treePredictProba(tree, features);
+    for (let c = 0; c < nClasses; c++) {
+      sum[c] += p[c] ?? 0;
+    }
   }
 
-  const flat = Array.from(probs as Iterable<number>);
+  const invT = 1 / forest.trees.length;
+  const proba = sum.map((v) => v * invT);
+
+  let best = 0;
+  for (let c = 1; c < nClasses; c++) {
+    if (proba[c] > proba[best]) best = c;
+  }
+
+  const prediction = forest.classes[best];
+
   const probabilities: Record<string, number> = {};
-  const classes: number[] = [];
-  for (let i = 0; i < flat.length; i++) {
-    classes.push(i);
-    probabilities[String(i)] = Math.round(flat[i] * 1000000) / 1000000;
+  for (let c = 0; c < forest.classes.length; c++) {
+    probabilities[String(forest.classes[c])] = Math.round(proba[c] * 1e6) / 1e6;
   }
 
-  return { prediction, classes, probabilities };
+  return {
+    prediction,
+    classes: [...forest.classes],
+    probabilities,
+  };
+}
+
+/** Alias for API route (async interface not required). */
+export async function runFatigueOnnx(features: [number, number, number]): Promise<FatigueOnnxResult> {
+  return runFatigueModel(features);
 }
