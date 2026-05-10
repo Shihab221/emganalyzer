@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../domain/emg_calibration.dart';
-import '../domain/signal_analysis.dart';
+import '../domain/signal_analysis.dart' show displaySampleRateHz;
 import '../models/sensor_sample.dart';
 import '../models/user_model.dart';
 import 'login_screen.dart';
@@ -144,6 +144,16 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
           _lastSessionId = null;
         });
         _kickWallTimer();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message']?.toString() ?? 'Could not start recording')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiService.messageFromError(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _recordingBusy = false);
@@ -164,6 +174,16 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
           if (sid != null) _lastSessionId = sid;
         });
         _wallTimer?.cancel();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message']?.toString() ?? 'Could not stop recording')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiService.messageFromError(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _recordingBusy = false);
@@ -182,7 +202,9 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
       await Share.shareXFiles([XFile(file.path)], text: 'EMG session CSV');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiService.messageFromError(e))),
+        );
       }
     }
   }
@@ -202,14 +224,6 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
         .abs();
   }
 
-  List<SensorSample> _rmsInput() {
-    final base = _hist.isNotEmpty
-        ? List<SensorSample>.from(_hist)
-        : (_latest != null ? <SensorSample>[_latest!] : <SensorSample>[]);
-    if (base.length > 512) return base.sublist(base.length - 512);
-    return base;
-  }
-
   List<SensorSample> _chartData() {
     if (_hist.isEmpty && _latest != null) return [_latest!];
     if (_hist.length <= 320) return List<SensorSample>.from(_hist);
@@ -221,7 +235,6 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final latestMv =
         _latest != null ? (rawEmgToMv(_latest!.emg) * 100).round() / 100 : null;
-    final rmsData = calculateRMS(_rmsInput());
 
     return Scaffold(
       body: Container(
@@ -373,11 +386,6 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
                 ),
                 const SizedBox(height: 12),
                 EmgLineChartCard(data: _chartData()),
-                const SizedBox(height: 14),
-                Text(
-                  'Rolling RMS (window ${rmsData.windowSize}): ${rmsData.value.toStringAsFixed(2)} mV',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
                 const SizedBox(height: 32),
               ],
             ),

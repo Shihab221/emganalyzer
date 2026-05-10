@@ -50,25 +50,16 @@ export function FFTDisplay({ data }: FFTDisplayProps) {
 
   return (
     <div className="glass-card">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 shadow-lg">
-            <Waves className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
-              FFT Analysis
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              DFT magnitude on AC mV samples (excluding DC bin for peak readout)
-            </p>
-          </div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 shadow-lg">
+          <Waves className="w-5 h-5 text-white" />
         </div>
-
-        <div className="text-right">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Dominant Frequency</p>
-          <p className="text-xl font-bold text-cyan-500">
-            {fft.dominantFrequency.toFixed(2)} Hz
+        <div>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+            FFT Analysis
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            DFT magnitude on AC mV samples (excluding DC bin for peak readout)
           </p>
         </div>
       </div>

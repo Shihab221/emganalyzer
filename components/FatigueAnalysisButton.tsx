@@ -85,7 +85,7 @@ export function FatigueAnalysisButton({ sessionId, doctorId, variant = 'detail' 
   };
 
   const resultBody =
-    result?.success && result.prediction != null && result.features ? (
+    result?.success && result.prediction != null ? (
       <>
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-xl bg-violet-500/20 shrink-0">
@@ -102,25 +102,6 @@ export function FatigueAnalysisButton({ sessionId, doctorId, variant = 'detail' 
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm mt-4">
-          <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
-            <p className="text-slate-500 text-xs">AC RMS (mV)</p>
-            <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{result.features.rmsMv}</p>
-          </div>
-          <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
-            <p className="text-slate-500 text-xs">Dominant frequency (Hz)</p>
-            <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-              {result.features.dominantFreqHz}
-            </p>
-          </div>
-          <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
-            <p className="text-slate-500 text-xs">σ instantaneous (mV)</p>
-            <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{result.features.stdMv}</p>
-          </div>
-        </div>
-        <p className="text-xs text-slate-500 mt-3 leading-relaxed">
-          Features match model input order: RMS → dominant FFT bin frequency → std dev of waveform (mV).
-        </p>
       </>
     ) : null;
 

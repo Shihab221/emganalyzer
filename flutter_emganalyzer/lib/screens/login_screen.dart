@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.of(context).pushNamedAndRemoveUntil(PatientDashboardScreen.route, (_) => false);
       }
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = ApiService.messageFromError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

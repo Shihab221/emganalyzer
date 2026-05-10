@@ -46,7 +46,7 @@ class _FatigueSessionRowState extends State<FatigueSessionRow> {
         setState(() => _error = res['message']?.toString() ?? 'Analysis failed');
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ApiService.messageFromError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -161,7 +161,6 @@ class _FatigueSessionRowState extends State<FatigueSessionRow> {
     final probs = (r['probabilities'] as Map?)
             ?.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())) ??
         {};
-    final feats = r['features'] as Map?;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       padding: const EdgeInsets.all(16),
@@ -202,34 +201,6 @@ class _FatigueSessionRowState extends State<FatigueSessionRow> {
             probs.entries.map((e) => 'Class ${e.key}: ${(e.value * 100).toStringAsFixed(1)}%').join(' · '),
             style: Theme.of(context).textTheme.bodySmall,
           ),
-          if (feats != null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _feat(context, 'RMS mV', '${feats['rmsMv']}')),
-                Expanded(child: _feat(context, 'Dom. Hz', '${feats['dominantFreqHz']}')),
-                Expanded(child: _feat(context, 'σ mV', '${feats['stdMv']}')),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _feat(BuildContext context, String label, String v) {
-    return Container(
-      margin: const EdgeInsets.only(right: 6),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey)),
-          Text(v, style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       ),
     );

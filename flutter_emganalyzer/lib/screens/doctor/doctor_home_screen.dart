@@ -49,7 +49,7 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ApiService.messageFromError(e);
           _loading = false;
         });
       }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -23,6 +24,49 @@ class ApiService {
 
   late final Dio _dio;
 
+  /// Human-readable API/network errors (avoids dumping raw [DioException] text in the UI).
+  static String messageFromError(Object error) {
+    if (error is BackendApiException) return error.message;
+    if (error is DioException) {
+      final inner = error.error;
+      if (inner is BackendApiException) return inner.message;
+      final data = error.response?.data;
+      return _messageFromResponseData(data, error.response?.statusCode);
+    }
+    final s = error.toString();
+    if (s.startsWith('Exception: ')) return s.substring(11);
+    return s;
+  }
+
+  static String _messageFromResponseData(dynamic data, int? statusCode) {
+    if (data is Map) {
+      final m = data['message'] ?? data['error'];
+      if (m != null) return m.toString();
+    }
+    if (data is String && data.isNotEmpty) {
+      try {
+        final j = jsonDecode(data);
+        if (j is Map && j['message'] != null) return j['message'].toString();
+      } catch (_) {
+        if (data.length < 500) return data;
+      }
+    }
+    final bytes = _asByteList(data);
+    if (bytes != null) {
+      try {
+        final j = jsonDecode(utf8.decode(bytes));
+        if (j is Map && j['message'] != null) return j['message'].toString();
+      } catch (_) {}
+    }
+    return 'Request failed${statusCode != null ? ' ($statusCode)' : ''}';
+  }
+
+  static Uint8List? _asByteList(dynamic data) {
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+    return null;
+  }
+
   void init({String? baseUrl}) {
     final root = baseUrl ?? kApiBaseUrl;
     _dio = Dio(
@@ -31,6 +75,27 @@ class ApiService {
         connectTimeout: const Duration(seconds: 25),
         receiveTimeout: const Duration(seconds: 60),
         headers: {'Content-Type': 'application/json'},
+        validateStatus: (code) => code != null && code < 600,
+      ),
+    );
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onResponse: (response, handler) {
+          final code = response.statusCode ?? 0;
+          if (code >= 400) {
+            final msg = _messageFromResponseData(response.data, code);
+            handler.reject(
+              DioException(
+                requestOptions: response.requestOptions,
+                response: response,
+                type: DioExceptionType.badResponse,
+                error: BackendApiException(msg, code),
+              ),
+            );
+            return;
+          }
+          handler.next(response);
+        },
       ),
     );
   }
@@ -83,7 +148,7 @@ class ApiService {
     final res = await _dio.get('/api/sessions', queryParameters: {'sessionId': sessionId});
     final map = Map<String, dynamic>.from(res.data as Map);
     if (map['success'] != true || map['session'] == null) {
-      throw BackendApiException('Session not found');
+      throw BackendApiException(map['message']?.toString() ?? 'Session not found', res.statusCode);
     }
     return EmgSession.fromJson(Map<String, dynamic>.from(map['session'] as Map));
   }
@@ -99,7 +164,7 @@ class ApiService {
   Future<List<DoctorComment>> fetchComments(String sessionId) async {
     final res = await _dio.get('/api/comments', queryParameters: {'sessionId': sessionId});
     final map = Map<String, dynamic>.from(res.data as Map);
-    if (map['success'] != true) throw BackendApiException('Failed comments');
+    if (map['success'] != true) throw BackendApiException(map['message']?.toString() ?? 'Failed comments');
     final list = map['comments'] as List<dynamic>? ?? [];
     return list.map((e) => DoctorComment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
   }
@@ -160,7 +225,18 @@ class ApiService {
     if (res.statusCode != 200 || res.data == null) {
       throw BackendApiException('CSV download failed', res.statusCode);
     }
-    return Uint8List.fromList(res.data!);
+    final bytes = Uint8List.fromList(res.data!);
+    if (bytes.isNotEmpty && bytes.length < 400 && bytes[0] == 0x7B) {
+      try {
+        final j = jsonDecode(utf8.decode(bytes));
+        if (j is Map && j['success'] == false) {
+          throw BackendApiException(j['message']?.toString() ?? 'CSV export failed', res.statusCode);
+        }
+      } catch (e) {
+        if (e is BackendApiException) rethrow;
+      }
+    }
+    return bytes;
   }
 
   String? parseFilenameFromHeaders(Headers h) {

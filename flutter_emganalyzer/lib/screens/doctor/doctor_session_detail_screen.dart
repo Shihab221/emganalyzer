@@ -82,7 +82,7 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
       final s = await ApiService.instance.fetchSession(widget.sessionId);
       if (mounted) setState(() => _session = s);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ApiService.messageFromError(e));
     } finally {
       if (mounted && !silent) setState(() => _loading = false);
     }
@@ -108,7 +108,7 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
         }
       }
     } catch (e) {
-      if (mounted) setState(() => _analysisErr = e.toString());
+      if (mounted) setState(() => _analysisErr = ApiService.messageFromError(e));
     } finally {
       if (mounted) setState(() => _analysisBusy = false);
     }
@@ -119,8 +119,12 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
     try {
       final c = await ApiService.instance.fetchComments(widget.sessionId);
       if (mounted) setState(() => _comments = c);
-    } catch (_) {
-      /* ignore */
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiService.messageFromError(e))),
+        );
+      }
     } finally {
       if (mounted) setState(() => _commentsBusy = false);
     }
@@ -138,7 +142,11 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
       _commentCtrl.clear();
       await _loadComments();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiService.messageFromError(e))),
+        );
+      }
     }
   }
 
@@ -150,7 +158,11 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
       await file.writeAsBytes(bytes);
       await Share.shareXFiles([XFile(file.path)], text: 'EMG session CSV');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiService.messageFromError(e))),
+        );
+      }
     }
   }
 
@@ -352,9 +364,8 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
         children: [
           Text('RMS analysis', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          Text('Window AC RMS (${rms.windowSize} samples): ${rms.value.toStringAsFixed(2)} mV'),
+          Text('Window: ${rms.windowSize} samples (AC coupling, mean removed)'),
           Text('Min / Max: ${st.min} / ${st.max} mV'),
-          Text('Mean ± σ: ${st.mean} ± ${st.stdDev} mV'),
         ],
       ),
     );
@@ -376,8 +387,6 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('FFT (bins)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-          Text('Dominant ~ ${fft.dominantFrequency.toStringAsFixed(2)} Hz',
-              style: Theme.of(context).textTheme.bodySmall),
           Expanded(
             child: n == 0
                 ? const Center(child: Text('Insufficient data'))
@@ -432,7 +441,6 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
     final probs = (r['probabilities'] as Map?)
             ?.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())) ??
         {};
-    final feats = r['features'] as Map?;
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(16),
@@ -446,8 +454,6 @@ class _DoctorSessionDetailScreenState extends State<DoctorSessionDetailScreen> {
           Text('Fatigue analysis', style: Theme.of(ctx).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
           Text(pred == 0 ? 'Class 0 (lower fatigue signal)' : 'Class 1 (elevated signal)'),
           Text(probs.entries.map((e) => '${e.key}: ${(e.value * 100).toStringAsFixed(1)}%').join(' · ')),
-          if (feats != null)
-            Text('Features: RMS ${feats['rmsMv']} · domHz ${feats['dominantFreqHz']} · σ ${feats['stdMv']}'),
         ],
       ),
     );
