@@ -91,6 +91,89 @@ body::before {
     @apply glass-card p-4 rounded-xl;
   }
 
+  /* Doctor roster — visually distinct from session / detail glass-cards */
+  .doctor-roster-card {
+    @apply relative isolate flex flex-wrap items-center justify-between gap-4 overflow-hidden px-6 py-5 md:py-6 pl-8;
+    border-radius: 1.85rem 0.875rem 1.85rem 0.875rem;
+    border: 1px solid rgba(167, 243, 208, 0.45);
+    box-shadow:
+      0 4px 24px -6px rgba(16, 185, 129, 0.12),
+      0 2px 8px -4px rgba(15, 23, 42, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    background: linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(236, 253, 245, 0.88) 36%,
+      rgba(248, 250, 252, 0.92) 100%
+    );
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+
+  .dark .doctor-roster-card {
+    border-color: rgba(52, 211, 153, 0.22);
+    background: linear-gradient(
+      125deg,
+      rgba(15, 23, 42, 0.92) 0%,
+      rgba(6, 78, 59, 0.35) 45%,
+      rgba(15, 23, 42, 0.9) 100%
+    );
+    box-shadow:
+      0 4px 28px -8px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .doctor-roster-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    border-radius: 1.85rem 0 0 1.85rem;
+    background: linear-gradient(
+      180deg,
+      #34d399 0%,
+      #14b8a6 50%,
+      #0ea5e9 100%
+    );
+    opacity: 0.95;
+  }
+
+  .doctor-roster-card::after {
+    content: '';
+    position: absolute;
+    right: -20%;
+    top: -40%;
+    width: 55%;
+    height: 160%;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(52, 211, 153, 0.14) 0%,
+      transparent 62%
+    );
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .doctor-roster-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(52, 211, 153, 0.55);
+    box-shadow:
+      0 14px 40px -12px rgba(16, 185, 129, 0.28),
+      0 6px 16px -6px rgba(15, 23, 42, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .dark .doctor-roster-card:hover {
+    border-color: rgba(52, 211, 153, 0.42);
+    box-shadow:
+      0 14px 48px -10px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(52, 211, 153, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
   /* Header glass style */
   .glass-header {
     @apply glass-card rounded-none rounded-b-2xl;
